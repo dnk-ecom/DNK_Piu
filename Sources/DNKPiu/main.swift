@@ -5,7 +5,7 @@ import SwiftUI
 
 /// Floating, nonactivating panel that accepts input without stealing focus from active editor/terminal.
 final class PiuPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
+    override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
 
@@ -16,7 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var statusItem: NSStatusItem?
     private var cancellables: Set<AnyCancellable> = []
     private let hotKey = DictationHotKey.shared
-    private let cornerKey = "piuTopRight"
+    private let margin: CGFloat = 16
+    private let topMargin: CGFloat = 8
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         store.start()
@@ -56,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         menu.delegate = self
         statusItem?.menu = menu
 
-        // 5. React to companion panel expansion
+        // 5. React to companion panel expansion with safe bounds animation
         store.$expanded
             .receive(on: DispatchQueue.main)
             .sink { [weak self] expanded in
@@ -103,18 +104,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         toggleItem.target = self
         menu.addItem(toggleItem)
 
-        let dictateItem = NSMenuItem(title: "Dictate Voice (Hold Right ⌥)", action: #selector(toggleDictate), keyEquivalent: "d")
+        let dictateItem = NSMenuItem(
+            title: "Dictate Voice (\(hotKey.activePreset.displayName))",
+            action: #selector(toggleDictate),
+            keyEquivalent: "d"
+        )
         dictateItem.target = self
         menu.addItem(dictateItem)
 
-        let resetItem = NSMenuItem(title: "Reset Position to Top-Right", action: #selector(resetCorner), keyEquivalent: "")
+        // HotKey Selection Submenu
+        let hotKeyMenu = NSMenu()
+        for preset in FlowKeyPreset.allCases {
+            let item = NSMenuItem(title: preset.displayName, action: #selector(selectHotKeyPreset(_:)), keyEquivalent: "")
+            item.representedObject = preset
+            item.target = self
+            if preset == hotKey.activePreset {
+                item.state = .on
+            }
+            hotKeyMenu.addItem(item)
+        }
+        let hotKeyParent = NSMenuItem(title: "Налаштування клавіші диктування", action: nil, keyEquivalent: "")
+        hotKeyParent.submenu = hotKeyMenu
+        menu.addItem(hotKeyParent)
+
+        let resetItem = NSMenuItem(title: "Скинути позицію у правий кут", action: #selector(resetCorner), keyEquivalent: "")
         resetItem.target = self
         menu.addItem(resetItem)
 
         menu.addItem(.separator())
-        let quitItem = NSMenuItem(title: "Quit DNK_Piu", action: #selector(quit), keyEquivalent: "q")
+        let accessibilityItem = NSMenuItem(title: "Дозволи Accessibility...", action: #selector(openAccessibility), keyEquivalent: "")
+        accessibilityItem.target = self
+        menu.addItem(accessibilityItem)
+
+        let quitItem = NSMenuItem(title: "Вийти з DNK_Piu", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
+    }
+
+    @objc private func selectHotKeyPreset(_ sender: NSMenuItem) {
+        if let preset = sender.representedObject as? FlowKeyPreset {
+            hotKey.setPreset(preset)
+        }
     }
 
     @objc private func copyHistoryItem(_ sender: NSMenuItem) {
@@ -123,24 +153,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
 
+    @objc private func openAccessibility() {
+        DictationHotKey.openAccessibilitySettings()
+    }
+
     private func positionPanel() {
-        guard let screen = NSScreen.main else { return }
+        guard let screen = panel?.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         let visible = screen.visibleFrame
-        let x = visible.maxX - Layout.pill.width - 20
-        let y = visible.maxY - Layout.pill.height - 10
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        let targetWidth: CGFloat = store.expanded ? Layout.panelWidth : Layout.pill.width
+        let targetHeight: CGFloat = store.expanded ? min(Layout.maxPanelHeight, visible.height - 40) : Layout.pill.height
+
+        let desiredX = visible.maxX - targetWidth - margin
+        let desiredY = visible.maxY - targetHeight - topMargin
+
+        let clampedX = min(max(desiredX, visible.minX + margin), visible.maxX - targetWidth - margin)
+        let clampedY = min(max(desiredY, visible.minY + margin), visible.maxY - targetHeight - topMargin)
+
+        panel.setFrame(NSRect(x: clampedX, y: clampedY, width: targetWidth, height: targetHeight), display: true, animate: false)
     }
 
     private func fit(expanded: Bool) {
-        let currentOrigin = panel.frame.origin
-        let currentHeight = panel.frame.height
-        let targetSize = expanded ? CGSize(width: Layout.panelWidth, height: 420) : Layout.pill
+        guard let screen = panel?.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
+        let visible = screen.visibleFrame
+        let targetWidth: CGFloat = expanded ? Layout.panelWidth : Layout.pill.width
+        let targetHeight: CGFloat = expanded ? min(Layout.maxPanelHeight, visible.height - 40) : Layout.pill.height
 
-        // Maintain top-right anchor when expanding
-        let newY = currentOrigin.y + (currentHeight - targetSize.height)
-        let newX = panel.frame.maxX - targetSize.width
+        // Explicitly anchor to top-right of visible frame with strict clamping inside screen borders
+        let desiredX = visible.maxX - targetWidth - margin
+        let desiredY = visible.maxY - targetHeight - topMargin
 
-        panel.setFrame(NSRect(origin: NSPoint(x: newX, y: newY), size: targetSize), display: true, animate: true)
+        let clampedX = min(max(desiredX, visible.minX + margin), visible.maxX - targetWidth - margin)
+        let clampedY = min(max(desiredY, visible.minY + margin), visible.maxY - targetHeight - topMargin)
+
+        panel.setFrame(NSRect(x: clampedX, y: clampedY, width: targetWidth, height: targetHeight), display: true, animate: true)
     }
 
     @objc private func toggleVisible() {
@@ -171,5 +216,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
-app.setActivationPolicy(.accessory) // Runs cleanly as an accessory without dock clutter
+app.setActivationPolicy(.accessory) // Runs cleanly as a status bar accessory without dock clutter
 app.run()

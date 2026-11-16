@@ -58,11 +58,14 @@ public struct SessionInfo: Identifiable, Equatable {
     public var rawStatus: String
     public var entrypoint: String
     public var agentKind: AgentKind
+    public var title: String?
+    public var lastStep: String?
     public var startedAt: Date
     public var updatedAt: Date
 
     public init(pid: Int32, sessionId: String, cwd: String, name: String, rawStatus: String,
-                entrypoint: String, agentKind: AgentKind = .unknown, startedAt: Date = Date(), updatedAt: Date = Date()) {
+                entrypoint: String, agentKind: AgentKind = .unknown, title: String? = nil,
+                lastStep: String? = nil, startedAt: Date = Date(), updatedAt: Date = Date()) {
         self.pid = pid
         self.sessionId = sessionId
         self.cwd = cwd
@@ -70,6 +73,8 @@ public struct SessionInfo: Identifiable, Equatable {
         self.rawStatus = rawStatus
         self.entrypoint = entrypoint
         self.agentKind = agentKind
+        self.title = title
+        self.lastStep = lastStep
         self.startedAt = startedAt
         self.updatedAt = updatedAt
     }

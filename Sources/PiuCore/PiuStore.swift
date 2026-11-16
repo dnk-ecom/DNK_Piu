@@ -188,12 +188,21 @@ public final class PiuStore: ObservableObject {
 
             DispatchQueue.main.async {
                 self.now = Date()
+                let hadIds = Set(self.pending.map(\.id))
+                let hasNew = loadedPending.contains { !hadIds.contains($0.id) }
+                if hasNew && !self.muted {
+                    NSSound(named: "Tink")?.play()
+                }
                 self.pending = loadedPending
 
                 // Update sessions keeping steps
                 self.sessions = loadedSessions.map { info in
                     var session = self.sessions.first(where: { $0.id == info.sessionId }) ?? AgentSession(info: info)
                     session.info = info
+                    if let t = info.title, !t.isEmpty { session.title = t }
+                    if let s = info.lastStep, !s.isEmpty {
+                        session.steps = [Step(id: UUID().uuidString, kind: .tool, state: .running, title: s)]
+                    }
                     return session
                 }
             }

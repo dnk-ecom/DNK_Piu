@@ -3,9 +3,9 @@ import PiuCore
 import SwiftUI
 
 public enum Layout {
-    public static let pill = CGSize(width: 140, height: 38)
-    public static let panelWidth: CGFloat = 340
-    public static let maxPanelHeight: CGFloat = 460
+    public static let pill = CGSize(width: 136, height: 36)
+    public static let panelWidth: CGFloat = 320
+    public static let maxPanelHeight: CGFloat = 440
     public static let emptyListHeight: CGFloat = 70
 }
 
@@ -476,6 +476,7 @@ public struct SessionRowView: View {
 
 public struct FooterDictationBar: View {
     @ObservedObject public var dictation = AudioDictation.shared
+    @ObservedObject public var hotKey = DictationHotKey.shared
 
     public init() {}
 
@@ -485,7 +486,7 @@ public struct FooterDictationBar: View {
                 .foregroundColor(Color(red: 0.18, green: 0.83, blue: 0.75))
                 .font(.system(size: 11))
 
-            Text(dictation.isRecording ? "Recording... (Hold ⌥ or double-tap)" : (dictation.lastTranscript.isEmpty ? "Google Cloud Dictation Ready" : dictation.lastTranscript))
+            Text(dictation.isRecording ? "Запис... (Відпустіть \(hotKey.activePreset.symbol))" : (dictation.lastTranscript.isEmpty ? "Хоткей: \(hotKey.activePreset.displayName)" : dictation.lastTranscript))
                 .font(.system(size: 10, weight: dictation.isRecording ? .semibold : .regular))
                 .foregroundColor(dictation.isRecording ? .red : .secondary)
                 .lineLimit(1)
@@ -496,7 +497,7 @@ public struct FooterDictationBar: View {
                 HStack(spacing: 4) {
                     Image(systemName: dictation.isRecording ? "stop.circle.fill" : "mic.fill")
                         .foregroundColor(dictation.isRecording ? .red : .primary)
-                    Text(dictation.isRecording ? "Stop" : "Dictate")
+                    Text(dictation.isRecording ? "Стоп" : "Диктувати")
                         .font(.system(size: 10, weight: .semibold))
                 }
                 .padding(.horizontal, 8)

@@ -132,11 +132,15 @@ public enum Sessions {
         }
         let rawKind = json["agentKind"] as? String ?? json["agent"] as? String ?? ""
         let agentKind = AgentKind(rawValue: rawKind) ?? .unknown
+        let title = json["title"] as? String
+        let lastStep = json["lastStep"] as? String ?? json["currentStep"] as? String ?? json["step"] as? String
 
         return SessionInfo(pid: pid, sessionId: sessionId, cwd: json["cwd"] as? String ?? "",
                            name: json["name"] as? String ?? "", rawStatus: json["status"] as? String ?? "",
                            entrypoint: json["entrypoint"] as? String ?? "",
                            agentKind: agentKind,
+                           title: title,
+                           lastStep: lastStep,
                            startedAt: date("startedAt"), updatedAt: date("updatedAt"))
     }
 }

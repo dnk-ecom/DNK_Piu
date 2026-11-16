@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import Carbon
 import Foundation
 
 /// High-velocity voice dictation engine powered by Google Cloud Vertex AI (Gemini 3.8 Flash Multimodal Audio).
@@ -191,13 +192,13 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             let payload: [String: Any] = [
                 "audio_base64": base64Audio,
                 "mime_type": "audio/wav",
-                "prompt": "Транскрибуй мову розробника (uk-UA / en-US). Зберігай технічні назви та сленг в оригіналі (Shopify, Clyro, Antigravity, commit, branch, PR, Swift, Python). Автоматично розставляй розділові знаки. Повертай ВИКЛЮЧНО розпізнаний текст без коментарів."
+                "prompt": "Транскрибуй мову розробника (uk-UA / en-US). Зберігай технічні назви та сленг в оригіналі (Shopify, Clyro, Antigravity, commit, branch, PR, Swift, Python, Coucou, Huddle). Автоматично розставляй розділові знаки. Повертай ВИКЛЮЧНО розпізнаний текст без лапок чи коментарів."
             ]
 
             var request = URLRequest(url: self.bridgeURL)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.timeoutInterval = 12.0
+            request.timeoutInterval = 15.0
 
             do {
                 request.httpBody = try JSONSerialization.data(withJSONObject: payload)
@@ -238,22 +239,30 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
                 returnedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             task.resume()
-            _ = semaphore.wait(timeout: .now() + 15.0)
+            _ = semaphore.wait(timeout: .now() + 16.0)
 
             if let transcript = returnedText, !transcript.isEmpty {
                 DispatchQueue.main.async {
                     self.lastTranscript = transcript
                     let newItem = DictationItem(text: transcript)
                     self.history.insert(newItem, at: 0)
-                    if self.history.count > 20 {
+                    if self.history.count > 25 {
                         self.history.removeLast()
                     }
                     self.saveHistory()
 
                     self.phase = .done(transcript)
+
+                    // Always copy to clipboard AND automatically paste at cursor if enabled
                     if insertAutomatically {
                         FlowPaste.insert(transcript)
+                    } else {
+                        FlowPaste.copyToClipboard(transcript)
                     }
+
+                    // Optional pleasant completion chime
+                    NSSound(named: "Pop")?.play()
+
                     completion?(transcript)
 
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
@@ -304,56 +313,79 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
     }
 }
 
-/// Transient pasteboard injector simulating ⌘V with clipboard preservation.
+/// Seamless pasteboard injector simulating ⌘V with universal keyboard layout support (Coucou-style).
 public enum FlowPaste {
+    /// Copies text directly to the system clipboard and keeps it there permanently.
+    public static func copyToClipboard(_ text: String) {
+        guard !text.isEmpty else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.declareTypes([.string], owner: nil)
+        pasteboard.setString(text, forType: .string)
+    }
+
+    /// Sets the text on the general pasteboard and synthesizes a ⌘V keystroke at the current cursor.
     public static func insert(_ text: String) {
         guard !text.isEmpty else { return }
 
-        let pasteboard = NSPasteboard.general
-        let previousChangeCount = pasteboard.changeCount
+        // 1. Permanently set text on the general clipboard so the user always has it!
+        copyToClipboard(text)
 
-        // 1. Snapshot previous clipboard items
-        var previousItems: [(NSPasteboard.PasteboardType, Data)] = []
-        if let items = pasteboard.pasteboardItems {
-            for item in items {
-                for type in item.types {
-                    if let data = item.data(forType: type) {
-                        previousItems.append((type, data))
-                    }
-                }
-            }
+        // 2. Accessibility Check:
+        // CGEvent posting requires Accessibility permissions (System Settings -> Privacy & Security -> Accessibility).
+        guard AXIsProcessTrusted() else {
+            // Text remains on clipboard for immediate manual ⌘V by the user.
+            return
         }
 
-        // 2. Set transient text
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        // 3. Small 40ms dispatch delay to ensure user-released modifier keys are clear from macOS event tap
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) {
+            let source = CGEventSource(stateID: .combinedSessionState)
+            let v = vKeyCode()
 
-        // Mark as transient for Raycast / Paste / Maccy
-        let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
-        let autoGeneratedType = NSPasteboard.PasteboardType("org.nspasteboard.AutoGeneratedType")
-        pasteboard.setData(Data(), forType: transientType)
-        pasteboard.setData(Data(), forType: autoGeneratedType)
+            let down = CGEvent(keyboardEventSource: source, virtualKey: v, keyDown: true)
+            let up = CGEvent(keyboardEventSource: source, virtualKey: v, keyDown: false)
+            down?.flags = .maskCommand
+            up?.flags = .maskCommand
 
-        // 3. Synthesize ⌘V keystroke
-        let source = CGEventSource(stateID: .combinedSessionState)
-        let vKeyCode: CGKeyCode = 0x09 // ANSI 'V' keycode
+            down?.post(tap: .cghidEventTap)
+            up?.post(tap: .cghidEventTap)
+        }
+    }
 
-        let down = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true)
-        let up = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false)
-        down?.flags = .maskCommand
-        up?.flags = .maskCommand
+    /// Dynamically resolves the physical key code for 'V' with Command held across keyboard layouts.
+    /// Handles QWERTY, AZERTY, Ukrainian, and layout switching seamlessly.
+    public static func vKeyCode() -> CGKeyCode {
+        let fallback = CGKeyCode(kVK_ANSI_V) // 0x09
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let raw = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return fallback }
+        let data = Unmanaged<CFData>.fromOpaque(raw).takeUnretainedValue() as Data
+        let commandState = UInt32((cmdKey >> 8) & 0xFF)
 
-        down?.post(tap: .cghidEventTap)
-        up?.post(tap: .cghidEventTap)
-
-        // 4. Restore clipboard after 700 ms if not modified by user
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-            if pasteboard.changeCount == previousChangeCount + 1 && !previousItems.isEmpty {
-                pasteboard.clearContents()
-                for (type, data) in previousItems {
-                    pasteboard.setData(data, forType: type)
+        let found: CGKeyCode? = data.withUnsafeBytes { bytes in
+            guard let layout = bytes.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return nil }
+            for code in 0..<128 {
+                var dead: UInt32 = 0
+                var length = 0
+                var chars = [UniChar](repeating: 0, count: 4)
+                let status = UCKeyTranslate(
+                    layout,
+                    UInt16(code),
+                    UInt16(kUCKeyActionDown),
+                    commandState,
+                    UInt32(LMGetKbdType()),
+                    OptionBits(kUCKeyTranslateNoDeadKeysBit),
+                    &dead,
+                    4,
+                    &length,
+                    &chars
+                )
+                if status == noErr, length > 0, chars[0] == 0x0076 /* 'v' */ {
+                    return CGKeyCode(code)
                 }
             }
+            return nil
         }
+        return found ?? fallback
     }
 }

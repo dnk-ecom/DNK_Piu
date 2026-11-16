@@ -1,10 +1,77 @@
 import AppKit
+import Carbon.HIToolbox
 import Foundation
 import PiuCore
 
+/// Supported physical hold-to-talk preset keys (like Coucou v0.6.0 FlowKey).
+public enum FlowKeyPreset: String, CaseIterable, Identifiable {
+    case rightOption = "rightOption"
+    case fn = "fn"
+    case rightCommand = "rightCommand"
+    case rightControl = "rightControl"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .rightOption: return "Right Option (⌥)"
+        case .fn: return "Fn / Globe"
+        case .rightCommand: return "Right Command (⌘)"
+        case .rightControl: return "Right Control (⌃)"
+        }
+    }
+
+    public var symbol: String {
+        switch self {
+        case .rightOption: return "⌥"
+        case .fn: return "fn"
+        case .rightCommand: return "⌘"
+        case .rightControl: return "⌃"
+        }
+    }
+
+    /// Exact physical key code sent by macOS on flagsChanged.
+    public var keyCode: UInt16 {
+        switch self {
+        case .rightOption: return UInt16(kVK_RightOption) // 61
+        case .fn: return UInt16(kVK_Function) // 63
+        case .rightCommand: return UInt16(kVK_RightCommand) // 54
+        case .rightControl: return UInt16(kVK_RightControl) // 62
+        }
+    }
+
+    /// Evaluates if this specific modifier key is held down.
+    /// Device-dependent bits differentiate the right key from the left key.
+    public func isDown(_ flags: NSEvent.ModifierFlags) -> Bool {
+        let raw = flags.rawValue
+        switch self {
+        case .rightOption:
+            // NX_DEVICERALTKEYMASK = 0x0000_0040
+            return (raw & 0x0000_0040) != 0
+        case .fn:
+            // kVK_Function (63) with .function flag
+            return flags.contains(.function)
+        case .rightCommand:
+            // NX_DEVICERCMDKEYMASK = 0x0000_0010
+            return (raw & 0x0000_0010) != 0
+        case .rightControl:
+            // NX_DEVICERCTLKEYMASK = 0x0000_2000
+            return (raw & 0x0000_2000) != 0
+        }
+    }
+}
+
 /// Global Hotkey Monitor for hold-to-talk voice dictation and double-tap hands-free mode.
-final class DictationHotKey {
-    static let shared = DictationHotKey()
+public final class DictationHotKey: ObservableObject {
+    public static let shared = DictationHotKey()
+
+    private static let keyPref = "piu_dictation_key"
+
+    @Published public var activePreset: FlowKeyPreset {
+        didSet {
+            UserDefaults.standard.set(activePreset.rawValue, forKey: Self.keyPref)
+        }
+    }
 
     private var globalMonitor: Any?
     private var localMonitor: Any?
@@ -13,30 +80,41 @@ final class DictationHotKey {
     private var lastTapUpTime: Double = 0
     private var tapTimer: DispatchWorkItem?
 
-    private init() {}
+    private init() {
+        if let saved = UserDefaults.standard.string(forKey: Self.keyPref),
+           let preset = FlowKeyPreset(rawValue: saved) {
+            self.activePreset = preset
+        } else {
+            self.activePreset = .rightOption
+        }
+    }
 
-    static func isAccessibilityGranted() -> Bool {
+    public static func isAccessibilityGranted() -> Bool {
         AXIsProcessTrusted()
     }
 
-    static func requestAccessibilityPermission() {
+    public static func requestAccessibilityPermission() {
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
-    static func openAccessibilitySettings() {
+    public static func openAccessibilitySettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
     }
 
-    func start() {
+    public func setPreset(_ preset: FlowKeyPreset) {
+        self.activePreset = preset
+    }
+
+    public func start() {
         guard globalMonitor == nil else { return }
 
         // Request system accessibility trust if not yet granted
         Self.requestAccessibilityPermission()
 
-        // Global monitor catches keys while another app is frontmost (Terminal, Cursor, Browser)
+        // Global monitor catches keys while another app is frontmost (Cursor, Ghostty, Terminal, Safari)
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { [weak self] event in
             self?.handle(event: event)
         }
@@ -48,7 +126,7 @@ final class DictationHotKey {
         }
     }
 
-    func stop() {
+    public func stop() {
         if let g = globalMonitor { NSEvent.removeMonitor(g); globalMonitor = nil }
         if let l = localMonitor { NSEvent.removeMonitor(l); localMonitor = nil }
         tapTimer?.cancel()
@@ -57,13 +135,13 @@ final class DictationHotKey {
 
     private func handle(event: NSEvent) {
         if event.type == .keyDown {
-            // Escape (keyCode 53) cancels dictation
+            // Escape (keyCode 53) cancels dictation immediately
             if event.keyCode == 53 && AudioDictation.shared.isRecording {
                 AudioDictation.shared.cancel()
                 return
             }
 
-            // Keyboard shortcut fallback: Control + Option + D (toggle dictation)
+            // Keyboard shortcut toggle: ⌃⌥D (Control + Option + D)
             let flags = event.modifierFlags.intersection([.control, .option, .command])
             if flags == [.control, .option] && event.charactersIgnoringModifiers?.lowercased() == "d" {
                 AudioDictation.shared.toggle()
@@ -74,36 +152,18 @@ final class DictationHotKey {
 
         guard event.type == .flagsChanged else { return }
 
-        let raw = event.modifierFlags.rawValue
-        let keyCode = event.keyCode
+        // CRITICAL: We ONLY handle flagsChanged events where event.keyCode matches our configured preset!
+        // This completely prevents arrow keys (123-126) and other function/modifier keys from triggering dictation.
+        guard event.keyCode == activePreset.keyCode else { return }
 
-        // Check target dictation keys:
-        // 1. Right Option (keyCode 61, NX_DEVICERALTKEYMASK = 0x40)
-        // 2. Fn / Globe key (keyCode 63, .function flag)
-        // 3. Right Command (keyCode 54, NX_DEVICERCMDKEYMASK = 0x10)
-        var isTargetKey = false
-        var isDown = false
-
-        if keyCode == 61 { // Right Option
-            isTargetKey = true
-            isDown = (raw & 0x0000_0040) != 0
-        } else if keyCode == 63 || event.modifierFlags.contains(.function) { // Fn / Globe
-            isTargetKey = true
-            isDown = event.modifierFlags.contains(.function)
-        } else if keyCode == 54 { // Right Command
-            isTargetKey = true
-            isDown = (raw & 0x0000_0010) != 0
-        }
-
-        guard isTargetKey else { return }
-
+        let isDown = activePreset.isDown(event.modifierFlags)
         let uptime = ProcessInfo.processInfo.systemUptime
 
         if isDown {
             guard !isKeyDown else { return }
             isKeyDown = true
 
-            // Double-tap check within 0.38s -> Hands-Free mode
+            // Double-tap detection within 0.38s -> Hands-Free Mode (Locked)
             if uptime - lastTapUpTime < 0.38 {
                 tapTimer?.cancel()
                 tapTimer = nil
@@ -113,7 +173,7 @@ final class DictationHotKey {
                 keyDownTime = uptime
                 AudioDictation.shared.start(locked: false)
             } else if case .listening(let isLocked) = AudioDictation.shared.phase, isLocked {
-                // In hands-free mode, pressing key again completes dictation
+                // In hands-free mode, pressing the key again finishes dictation
                 AudioDictation.shared.stopAndTranscribe()
             }
         } else {
@@ -127,11 +187,11 @@ final class DictationHotKey {
                     return
                 }
 
-                if holdDuration >= 0.25 {
+                if holdDuration >= 0.22 {
                     // Normal hold-to-talk: user held key while speaking and let go -> STOP & TRANSCRIBE!
                     AudioDictation.shared.stopAndTranscribe()
                 } else {
-                    // Quick tap -> wait for potential second tap
+                    // Short tap (<0.22s): wait for possible second tap
                     lastTapUpTime = uptime
                     let workItem = DispatchWorkItem { [weak self] in
                         guard self != nil else { return }
