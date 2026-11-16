@@ -9,7 +9,7 @@ final class PiuPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     private let store = PiuStore()
     private var panel: PiuPanel!
     private var dictationPanel: DictationPillPanel!
@@ -47,18 +47,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // 3. Start Global HotKey Monitor (Right Option hold-to-talk / double-tap hands-free)
         hotKey.start()
 
-        // 4. Setup Menubar status item
+        // 4. Setup Menubar status item with dynamic delegate
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem?.button?.title = "Piu"
         statusItem?.button?.image = NSImage(systemSymbolName: "cpu", accessibilityDescription: "DNK_Piu")
 
         let menu = NSMenu()
-        menu.addItem(withTitle: "Toggle DNK_Piu Widget", action: #selector(toggleVisible), keyEquivalent: "p")
-        menu.addItem(withTitle: "Dictate Voice (Hold Right ⌥)", action: #selector(toggleDictate), keyEquivalent: "d")
-        menu.addItem(withTitle: "Reset Position to Top-Right", action: #selector(resetCorner), keyEquivalent: "")
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit DNK_Piu", action: #selector(quit), keyEquivalent: "q")
-        for entry in menu.items { entry.target = self }
+        menu.delegate = self
         statusItem?.menu = menu
 
         // 5. React to companion panel expansion
@@ -85,6 +80,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .store(in: &cancellables)
     }
 
+    func menuWillOpen(_ menu: NSMenu) {
+        menu.removeAllItems()
+
+        // TOP SECTION IN MENU: Recent dictated texts
+        if !store.dictation.history.isEmpty {
+            let header = NSMenuItem(title: "🎙️ Надиктовано (останні):", action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            menu.addItem(header)
+
+            for item in store.dictation.history.prefix(3) {
+                let preview = item.text.count > 34 ? "\(item.text.prefix(34))..." : item.text
+                let menuItem = NSMenuItem(title: "  📋 \"\(preview)\"", action: #selector(copyHistoryItem(_:)), keyEquivalent: "")
+                menuItem.representedObject = item.text
+                menuItem.target = self
+                menu.addItem(menuItem)
+            }
+            menu.addItem(.separator())
+        }
+
+        let toggleItem = NSMenuItem(title: "Toggle DNK_Piu Widget", action: #selector(toggleVisible), keyEquivalent: "p")
+        toggleItem.target = self
+        menu.addItem(toggleItem)
+
+        let dictateItem = NSMenuItem(title: "Dictate Voice (Hold Right ⌥)", action: #selector(toggleDictate), keyEquivalent: "d")
+        dictateItem.target = self
+        menu.addItem(dictateItem)
+
+        let resetItem = NSMenuItem(title: "Reset Position to Top-Right", action: #selector(resetCorner), keyEquivalent: "")
+        resetItem.target = self
+        menu.addItem(resetItem)
+
+        menu.addItem(.separator())
+        let quitItem = NSMenuItem(title: "Quit DNK_Piu", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+    }
+
+    @objc private func copyHistoryItem(_ sender: NSMenuItem) {
+        if let text = sender.representedObject as? String {
+            FlowPaste.insert(text)
+        }
+    }
+
     private func positionPanel() {
         guard let screen = NSScreen.main else { return }
         let visible = screen.visibleFrame
@@ -96,7 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func fit(expanded: Bool) {
         let currentOrigin = panel.frame.origin
         let currentHeight = panel.frame.height
-        let targetSize = expanded ? CGSize(width: Layout.panelWidth, height: 380) : Layout.pill
+        let targetSize = expanded ? CGSize(width: Layout.panelWidth, height: 420) : Layout.pill
 
         // Maintain top-right anchor when expanding
         let newY = currentOrigin.y + (currentHeight - targetSize.height)

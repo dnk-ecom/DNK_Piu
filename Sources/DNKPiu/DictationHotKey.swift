@@ -15,8 +15,26 @@ final class DictationHotKey {
 
     private init() {}
 
+    static func isAccessibilityGranted() -> Bool {
+        AXIsProcessTrusted()
+    }
+
+    static func requestAccessibilityPermission() {
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+    }
+
+    static func openAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     func start() {
         guard globalMonitor == nil else { return }
+
+        // Request system accessibility trust if not yet granted
+        Self.requestAccessibilityPermission()
 
         // Global monitor catches keys while another app is frontmost (Terminal, Cursor, Browser)
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { [weak self] event in
@@ -42,67 +60,87 @@ final class DictationHotKey {
             // Escape (keyCode 53) cancels dictation
             if event.keyCode == 53 && AudioDictation.shared.isRecording {
                 AudioDictation.shared.cancel()
+                return
+            }
+
+            // Keyboard shortcut fallback: Control + Option + D (toggle dictation)
+            let flags = event.modifierFlags.intersection([.control, .option, .command])
+            if flags == [.control, .option] && event.charactersIgnoringModifiers?.lowercased() == "d" {
+                AudioDictation.shared.toggle()
+                return
             }
             return
         }
 
         guard event.type == .flagsChanged else { return }
 
-        // NX_DEVICERALTKEYMASK = 0x0000_0040 (Right Option)
-        // NX_DEVICEFunctionKey = Fn / Globe key
         let raw = event.modifierFlags.rawValue
-        let isRightOption = (raw & 0x0000_0040 != 0) || (event.keyCode == 61)
+        let keyCode = event.keyCode
+
+        // Check target dictation keys:
+        // 1. Right Option (keyCode 61, NX_DEVICERALTKEYMASK = 0x40)
+        // 2. Fn / Globe key (keyCode 63, .function flag)
+        // 3. Right Command (keyCode 54, NX_DEVICERCMDKEYMASK = 0x10)
+        var isTargetKey = false
+        var isDown = false
+
+        if keyCode == 61 { // Right Option
+            isTargetKey = true
+            isDown = (raw & 0x0000_0040) != 0
+        } else if keyCode == 63 || event.modifierFlags.contains(.function) { // Fn / Globe
+            isTargetKey = true
+            isDown = event.modifierFlags.contains(.function)
+        } else if keyCode == 54 { // Right Command
+            isTargetKey = true
+            isDown = (raw & 0x0000_0010) != 0
+        }
+
+        guard isTargetKey else { return }
 
         let uptime = ProcessInfo.processInfo.systemUptime
 
-        if isRightOption {
-            if !isKeyDown {
-                // Key pressed DOWN
-                isKeyDown = true
+        if isDown {
+            guard !isKeyDown else { return }
+            isKeyDown = true
 
-                // Check for double-tap within 0.38s
-                if uptime - lastTapUpTime < 0.38 {
-                    tapTimer?.cancel()
-                    tapTimer = nil
-                    lastTapUpTime = 0
-                    // Double-tap detected -> lock into hands-free mode!
-                    AudioDictation.shared.start(locked: true)
-                } else if AudioDictation.shared.phase == .idle {
-                    keyDownTime = uptime
-                    AudioDictation.shared.start(locked: false)
-                } else if case .listening(let isLocked) = AudioDictation.shared.phase, isLocked {
-                    // In hands-free mode, pressing Right Option again completes the dictation
-                    AudioDictation.shared.stopAndTranscribe()
-                }
+            // Double-tap check within 0.38s -> Hands-Free mode
+            if uptime - lastTapUpTime < 0.38 {
+                tapTimer?.cancel()
+                tapTimer = nil
+                lastTapUpTime = 0
+                AudioDictation.shared.start(locked: true)
+            } else if AudioDictation.shared.phase == .idle {
+                keyDownTime = uptime
+                AudioDictation.shared.start(locked: false)
+            } else if case .listening(let isLocked) = AudioDictation.shared.phase, isLocked {
+                // In hands-free mode, pressing key again completes dictation
+                AudioDictation.shared.stopAndTranscribe()
             }
         } else {
-            if isKeyDown {
-                // Key released UP
-                isKeyDown = false
-                let holdDuration = uptime - keyDownTime
+            guard isKeyDown else { return }
+            isKeyDown = false
+            let holdDuration = uptime - keyDownTime
 
-                if case .listening(let isLocked) = AudioDictation.shared.phase {
-                    if isLocked {
-                        // In hands-free mode, release does not stop recording
-                        return
-                    }
+            if case .listening(let isLocked) = AudioDictation.shared.phase {
+                if isLocked {
+                    // In hands-free mode, key release does not stop recording
+                    return
+                }
 
-                    if holdDuration >= 0.28 {
-                        // Normal hold-to-talk: user held the key while speaking and let go
-                        AudioDictation.shared.stopAndTranscribe()
-                    } else {
-                        // Quick tap: wait briefly to see if user taps a second time
-                        lastTapUpTime = uptime
-                        let workItem = DispatchWorkItem { [weak self] in
-                            guard self != nil else { return }
-                            if case .listening(let locked) = AudioDictation.shared.phase, !locked {
-                                // Tap timed out with no hold: cancel recording
-                                AudioDictation.shared.cancel()
-                            }
+                if holdDuration >= 0.25 {
+                    // Normal hold-to-talk: user held key while speaking and let go -> STOP & TRANSCRIBE!
+                    AudioDictation.shared.stopAndTranscribe()
+                } else {
+                    // Quick tap -> wait for potential second tap
+                    lastTapUpTime = uptime
+                    let workItem = DispatchWorkItem { [weak self] in
+                        guard self != nil else { return }
+                        if case .listening(let locked) = AudioDictation.shared.phase, !locked {
+                            AudioDictation.shared.cancel()
                         }
-                        tapTimer = workItem
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.38, execute: workItem)
                     }
+                    tapTimer = workItem
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.38, execute: workItem)
                 }
             }
         }

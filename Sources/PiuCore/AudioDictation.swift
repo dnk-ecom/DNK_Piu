@@ -16,6 +16,25 @@ public enum DictationPhase: Equatable {
     }
 }
 
+/// A recorded and transcribed voice message item.
+public struct DictationItem: Identifiable, Codable, Equatable {
+    public let id: UUID
+    public let text: String
+    public let timestamp: Date
+
+    public init(id: UUID = UUID(), text: String, timestamp: Date = Date()) {
+        self.id = id
+        self.text = text
+        self.timestamp = timestamp
+    }
+
+    public var formattedTime: String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: timestamp)
+    }
+}
+
 public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDelegate {
     public static let shared = AudioDictation()
 
@@ -24,15 +43,37 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
     @Published public private(set) var phase: DictationPhase = .idle
     @Published public private(set) var audioLevels: [Float] = [0.12, 0.18, 0.25, 0.4, 0.25, 0.18, 0.12]
     @Published public var lastTranscript: String = ""
+    @Published public var history: [DictationItem] = []
     @Published public var errorMessage: String? = nil
 
     private var recorder: AVAudioRecorder?
     private var meterTimer: Timer?
     private let recordingURL = URL(fileURLWithPath: "/tmp/dnk_piu_audio.wav")
     private let bridgeURL = URL(string: "http://127.0.0.1:11435/v1/audio/transcriptions")!
+    private let historyKey = "piu_dictation_history"
 
     private override init() {
         super.init()
+        loadHistory()
+    }
+
+    private func loadHistory() {
+        if let data = UserDefaults.standard.data(forKey: historyKey),
+           let items = try? JSONDecoder().decode([DictationItem].self, from: data), !items.isEmpty {
+            self.history = items
+            self.lastTranscript = items.first?.text ?? ""
+        } else if let saved = UserDefaults.standard.string(forKey: "piu_last_transcript"), !saved.isEmpty {
+            let item = DictationItem(text: saved)
+            self.history = [item]
+            self.lastTranscript = saved
+        }
+    }
+
+    private func saveHistory() {
+        if let encoded = try? JSONEncoder().encode(history) {
+            UserDefaults.standard.set(encoded, forKey: historyKey)
+        }
+        UserDefaults.standard.set(lastTranscript, forKey: "piu_last_transcript")
     }
 
     /// Toggles or starts voice dictation.
@@ -94,6 +135,22 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             self.isProcessing = false
             self.phase = .idle
         }
+    }
+
+    /// Clears all recorded transcripts.
+    public func clearHistory() {
+        history.removeAll()
+        lastTranscript = ""
+        saveHistory()
+    }
+
+    /// Removes a specific transcript item.
+    public func remove(item: DictationItem) {
+        history.removeAll { $0.id == item.id }
+        if lastTranscript == item.text {
+            lastTranscript = history.first?.text ?? ""
+        }
+        saveHistory()
     }
 
     /// Stops recording and sends the audio to Vertex AI Gemini 3.8 Flash for transcription.
@@ -186,6 +243,13 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             if let transcript = returnedText, !transcript.isEmpty {
                 DispatchQueue.main.async {
                     self.lastTranscript = transcript
+                    let newItem = DictationItem(text: transcript)
+                    self.history.insert(newItem, at: 0)
+                    if self.history.count > 20 {
+                        self.history.removeLast()
+                    }
+                    self.saveHistory()
+
                     self.phase = .done(transcript)
                     if insertAutomatically {
                         FlowPaste.insert(transcript)
