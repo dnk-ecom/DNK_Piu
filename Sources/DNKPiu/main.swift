@@ -12,14 +12,16 @@ final class PiuPanel: NSPanel {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let store = PiuStore()
     private var panel: PiuPanel!
+    private var dictationPanel: DictationPillPanel!
     private var statusItem: NSStatusItem?
     private var cancellables: Set<AnyCancellable> = []
+    private let hotKey = DictationHotKey.shared
     private let cornerKey = "piuTopRight"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         store.start()
 
-        // 1. Configure floating panel
+        // 1. Configure main floating companion panel (Top-Right)
         panel = PiuPanel(
             contentRect: NSRect(origin: .zero, size: Layout.pill),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -39,25 +41,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         positionPanel()
         panel.orderFrontRegardless()
 
-        // 2. Setup Menubar status item
+        // 2. Configure dedicated pop-up dictation pill (Bottom Center, Coucou-style)
+        dictationPanel = DictationPillPanel()
+
+        // 3. Start Global HotKey Monitor (Right Option hold-to-talk / double-tap hands-free)
+        hotKey.start()
+
+        // 4. Setup Menubar status item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem?.button?.title = "Piu"
         statusItem?.button?.image = NSImage(systemSymbolName: "cpu", accessibilityDescription: "DNK_Piu")
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Toggle DNK_Piu Widget", action: #selector(toggleVisible), keyEquivalent: "p")
-        menu.addItem(withTitle: "Dictate Voice (Google Gemini)", action: #selector(toggleDictate), keyEquivalent: "d")
+        menu.addItem(withTitle: "Dictate Voice (Hold Right ⌥)", action: #selector(toggleDictate), keyEquivalent: "d")
         menu.addItem(withTitle: "Reset Position to Top-Right", action: #selector(resetCorner), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit DNK_Piu", action: #selector(quit), keyEquivalent: "q")
         for entry in menu.items { entry.target = self }
         statusItem?.menu = menu
 
-        // 3. React to expanded state changes
+        // 5. React to companion panel expansion
         store.$expanded
             .receive(on: DispatchQueue.main)
             .sink { [weak self] expanded in
                 self?.fit(expanded: expanded)
+            }
+            .store(in: &cancellables)
+
+        // 6. React to Dictation Phase to show/hide the pop-up pill
+        store.dictation.$phase
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] phase in
+                guard let self = self else { return }
+                if phase == .idle {
+                    self.dictationPanel.hideAnimated()
+                } else {
+                    if !self.dictationPanel.isVisible {
+                        self.dictationPanel.showAnimated()
+                    }
+                }
             }
             .store(in: &cancellables)
     }
@@ -99,6 +122,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func quit() {
+        hotKey.stop()
+        dictationPanel?.orderOut(nil)
         store.stop()
         NSApp.terminate(nil)
     }

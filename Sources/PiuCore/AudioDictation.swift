@@ -3,15 +3,31 @@ import AVFoundation
 import Foundation
 
 /// High-velocity voice dictation engine powered by Google Cloud Vertex AI (Gemini 3.8 Flash Multimodal Audio).
+public enum DictationPhase: Equatable {
+    case idle
+    case listening(isLocked: Bool)
+    case thinking
+    case done(String)
+    case failed(String)
+
+    public var isHandsFree: Bool {
+        if case .listening(let isLocked) = self { return isLocked }
+        return false
+    }
+}
+
 public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDelegate {
     public static let shared = AudioDictation()
 
     @Published public private(set) var isRecording = false
     @Published public private(set) var isProcessing = false
+    @Published public private(set) var phase: DictationPhase = .idle
+    @Published public private(set) var audioLevels: [Float] = [0.12, 0.18, 0.25, 0.4, 0.25, 0.18, 0.12]
     @Published public var lastTranscript: String = ""
     @Published public var errorMessage: String? = nil
 
     private var recorder: AVAudioRecorder?
+    private var meterTimer: Timer?
     private let recordingURL = URL(fileURLWithPath: "/tmp/dnk_piu_audio.wav")
     private let bridgeURL = URL(string: "http://127.0.0.1:11435/v1/audio/transcriptions")!
 
@@ -24,13 +40,20 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
         if isRecording {
             stopAndTranscribe()
         } else {
-            start()
+            start(locked: true)
         }
     }
 
     /// Starts recording microphone input.
-    public func start() {
-        guard !isRecording else { return }
+    public func start(locked: Bool = false) {
+        guard !isRecording else {
+            if locked {
+                DispatchQueue.main.async {
+                    self.phase = .listening(isLocked: true)
+                }
+            }
+            return
+        }
 
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatLinearPCM),
@@ -43,16 +66,33 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
 
         do {
             recorder = try AVAudioRecorder(url: recordingURL, settings: settings)
+            recorder?.isMeteringEnabled = true
             recorder?.delegate = self
             recorder?.record()
             DispatchQueue.main.async {
                 self.isRecording = true
+                self.phase = .listening(isLocked: locked)
                 self.errorMessage = nil
+                self.startMetering()
             }
         } catch {
             DispatchQueue.main.async {
                 self.errorMessage = "Failed to start audio recording: \(error.localizedDescription)"
+                self.phase = .failed(self.errorMessage ?? "Error")
             }
+        }
+    }
+
+    /// Cancels active recording without transcribing.
+    public func cancel() {
+        stopMetering()
+        recorder?.stop()
+        recorder = nil
+        try? FileManager.default.removeItem(at: recordingURL)
+        DispatchQueue.main.async {
+            self.isRecording = false
+            self.isProcessing = false
+            self.phase = .idle
         }
     }
 
@@ -60,12 +100,14 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
     public func stopAndTranscribe(insertAutomatically: Bool = true, completion: ((String?) -> Void)? = nil) {
         guard isRecording else { return }
 
+        stopMetering()
         recorder?.stop()
         recorder = nil
 
         DispatchQueue.main.async {
             self.isRecording = false
             self.isProcessing = true
+            self.phase = .thinking
         }
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -79,7 +121,11 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             guard let audioData = try? Data(contentsOf: self.recordingURL), !audioData.isEmpty else {
                 DispatchQueue.main.async {
                     self.errorMessage = "No audio data recorded"
+                    self.phase = .failed("No audio")
                     completion?(nil)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        if case .failed = self.phase { self.phase = .idle }
+                    }
                 }
                 return
             }
@@ -88,7 +134,7 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             let payload: [String: Any] = [
                 "audio_base64": base64Audio,
                 "mime_type": "audio/wav",
-                "prompt": "Транскрибуй мову розробника (uk-UA / en-US). Зберігай технічні назви та сленг в оригіналі (Shopify, Clyro, Antigravity, commit, branch, PR, Swift, Python). Автоматично розставляй розділові знаки. Повертай ВИКЛЮЧНО текст без коментарів."
+                "prompt": "Транскрибуй мову розробника (uk-UA / en-US). Зберігай технічні назви та сленг в оригіналі (Shopify, Clyro, Antigravity, commit, branch, PR, Swift, Python). Автоматично розставляй розділові знаки. Повертай ВИКЛЮЧНО розпізнаний текст без коментарів."
             ]
 
             var request = URLRequest(url: self.bridgeURL)
@@ -101,7 +147,11 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             } catch {
                 DispatchQueue.main.async {
                     self.errorMessage = "Serialization error: \(error.localizedDescription)"
+                    self.phase = .failed("Payload error")
                     completion?(nil)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        if case .failed = self.phase { self.phase = .idle }
+                    }
                 }
                 return
             }
@@ -136,17 +186,57 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             if let transcript = returnedText, !transcript.isEmpty {
                 DispatchQueue.main.async {
                     self.lastTranscript = transcript
+                    self.phase = .done(transcript)
                     if insertAutomatically {
                         FlowPaste.insert(transcript)
                     }
                     completion?(transcript)
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                        if case .done = self.phase {
+                            self.phase = .idle
+                        }
+                    }
                 }
             } else {
                 DispatchQueue.main.async {
+                    self.phase = .failed(self.errorMessage ?? "Empty transcript")
                     completion?(nil)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                        if case .failed = self.phase {
+                            self.phase = .idle
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private func startMetering() {
+        meterTimer?.invalidate()
+        meterTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            guard let self = self, let recorder = self.recorder, recorder.isRecording else { return }
+            recorder.updateMeters()
+            let power = recorder.averagePower(forChannel: 0) // -160 to 0 dB
+            let normalized = max(0.05, min(1.0, Float((power + 42.0) / 42.0)))
+
+            let t = Date().timeIntervalSinceReferenceDate
+            var levels: [Float] = []
+            for i in 0..<7 {
+                let jitter = Float(sin(t * 12.0 + Double(i) * 1.3)) * 0.12
+                let val = max(0.08, min(1.0, normalized * (0.65 + Float(i % 3) * 0.18) + jitter))
+                levels.append(val)
+            }
+            DispatchQueue.main.async {
+                self.audioLevels = levels
+            }
+        }
+    }
+
+    private func stopMetering() {
+        meterTimer?.invalidate()
+        meterTimer = nil
+        audioLevels = [0.12, 0.18, 0.25, 0.4, 0.25, 0.18, 0.12]
     }
 }
 
