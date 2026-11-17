@@ -8,7 +8,7 @@ public enum DictationPhase: Equatable {
     case idle
     case listening(isLocked: Bool)
     case thinking
-    case done(String)
+    case done(String, wasPasted: Bool)
     case failed(String)
 
     public var isHandsFree: Bool {
@@ -54,6 +54,9 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
     private let bridgeURL = URL(string: "http://127.0.0.1:11435/v1/audio/transcriptions")!
     private let historyKey = "piu_dictation_history"
 
+    /// The frontmost app active when recording began (where the text should go)
+    private var targetApp: NSRunningApplication?
+
     private override init() {
         super.init()
         loadHistory()
@@ -98,6 +101,12 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             return
         }
 
+        // Capture frontmost app where cursor currently lives (Coucou technique)
+        let front = NSWorkspace.shared.frontmostApplication
+        if let f = front, f.bundleIdentifier != Bundle.main.bundleIdentifier {
+            self.targetApp = f
+        }
+
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatLinearPCM),
             AVSampleRateKey: 16000.0,
@@ -131,6 +140,7 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
         stopMetering()
         recorder?.stop()
         recorder = nil
+        targetApp = nil
         try? FileManager.default.removeItem(at: recordingURL)
         DispatchQueue.main.async {
             self.isRecording = false
@@ -162,6 +172,8 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
         stopMetering()
         recorder?.stop()
         recorder = nil
+
+        let destApp = self.targetApp
 
         DispatchQueue.main.async {
             self.isRecording = false
@@ -236,19 +248,18 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
                     }
                     self.saveHistory()
 
-                    self.phase = .done(transcript)
-
-                    // Always copy to clipboard AND automatically paste at cursor
+                    var pasted = false
                     if insertAutomatically {
-                        FlowPaste.insert(transcript)
+                        pasted = FlowPaste.insert(transcript, into: destApp)
                     } else {
                         FlowPaste.copyToClipboard(transcript)
                     }
 
+                    self.phase = .done(transcript, wasPasted: pasted)
                     NSSound(named: "Pop")?.play()
                     completion?(transcript)
 
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
                         if case .done = self.phase {
                             self.phase = .idle
                         }
@@ -307,21 +318,28 @@ public enum FlowPaste {
         pasteboard.setString(text, forType: .string)
     }
 
-    /// Sets the text on the general pasteboard and synthesizes a ⌘V keystroke at the current cursor.
-    public static func insert(_ text: String) {
-        guard !text.isEmpty else { return }
+    /// Sets the text on the general pasteboard, restores focus to target app, and synthesizes ⌘V.
+    @discardableResult
+    public static func insert(_ text: String, into targetApp: NSRunningApplication? = nil) -> Bool {
+        guard !text.isEmpty else { return false }
 
-        // 1. Permanently set text on the general clipboard so the user always has it!
+        // 1. Permanently copy text to general clipboard
         copyToClipboard(text)
 
-        // 2. Accessibility Check:
-        guard AXIsProcessTrusted() else {
-            // Text remains on clipboard for immediate manual ⌘V by the user.
-            return
+        // 2. Reactivate the destination app where cursor was located (Coucou technique)
+        if let app = targetApp, app.bundleIdentifier != Bundle.main.bundleIdentifier {
+            app.activate()
         }
 
-        // 3. Small 50ms dispatch delay to ensure user-released modifier keys are clear from macOS event tap
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        let isTrusted = AXIsProcessTrusted()
+
+        // 3. Small dispatch delay to ensure user-released modifier keys (⌥) are settled in the event tap
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            // Re-activate app just in case
+            if let app = targetApp, app.bundleIdentifier != Bundle.main.bundleIdentifier {
+                app.activate()
+            }
+
             let source = CGEventSource(stateID: .combinedSessionState)
             let v = vKeyCode()
 
@@ -330,9 +348,23 @@ public enum FlowPaste {
             down?.flags = .maskCommand
             up?.flags = .maskCommand
 
+            // Post to both hardware HID and window server session
             down?.post(tap: .cghidEventTap)
             up?.post(tap: .cghidEventTap)
+
+            down?.post(tap: .cgSessionEventTap)
+            up?.post(tap: .cgSessionEventTap)
+
+            // Attempt AppleScript fallback keystroke if CGEvent was blocked by TCC
+            if !isTrusted {
+                let scriptSource = "tell application \"System Events\" to keystroke \"v\" using command down"
+                let script = NSAppleScript(source: scriptSource)
+                var errorInfo: NSDictionary?
+                script?.executeAndReturnError(&errorInfo)
+            }
         }
+
+        return isTrusted
     }
 
     /// Dynamically resolves the physical key code for 'V' with Command held across keyboard layouts.

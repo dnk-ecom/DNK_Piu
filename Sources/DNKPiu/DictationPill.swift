@@ -62,23 +62,23 @@ struct DictationPillContainerView: View {
     var body: some View {
         VStack(spacing: 6) {
             // Speech Bubble / Announcement above the pill
-            if case .done(let text) = dictation.phase, !text.isEmpty {
+            if case .done(let text, let wasPasted) = dictation.phase, !text.isEmpty {
                 HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(Color(hex: "#10B981"))
+                    Image(systemName: wasPasted ? "checkmark.circle.fill" : "doc.on.clipboard.fill")
+                        .foregroundColor(Color(hex: wasPasted ? "#10B981" : "#F59E0B"))
                         .font(.system(size: 11, weight: .bold))
 
-                    Text(text.count > 36 ? "\(text.prefix(36))..." : text)
+                    Text(text.count > 34 ? "\(text.prefix(34))..." : text)
                         .font(.system(size: 11.5, weight: .medium, design: .rounded))
                         .foregroundColor(Color.white.opacity(0.95))
                         .lineLimit(1)
 
-                    Text("Вставлено")
+                    Text(wasPasted ? "Вставлено" : "Скопійовано")
                         .font(.system(size: 9.5, weight: .bold))
-                        .foregroundColor(Color(hex: "#10B981"))
+                        .foregroundColor(Color(hex: wasPasted ? "#10B981" : "#F59E0B"))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(Color(hex: "#10B981").opacity(0.18))
+                        .background(Color(hex: wasPasted ? "#10B981" : "#F59E0B").opacity(0.18))
                         .clipShape(Capsule())
                 }
                 .padding(.horizontal, 12)
@@ -185,12 +185,12 @@ struct CoucouFlowPillView: View {
                     // 9 Ripple Dots during Gemini 3.8 Flash transcription
                     CoucouNineDotsView(levels: dictation.audioLevels, isThinking: true)
 
-                case .done:
-                    Image(systemName: "checkmark")
+                case .done(_, let wasPasted):
+                    Image(systemName: wasPasted ? "checkmark" : "doc.on.clipboard")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color(hex: "#10B981"))
+                        .foregroundColor(Color(hex: wasPasted ? "#10B981" : "#F59E0B"))
 
-                    Text("Готово")
+                    Text(wasPasted ? "Готово" : "Скопійовано")
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
 
@@ -200,7 +200,7 @@ struct CoucouFlowPillView: View {
                         .foregroundColor(Color(hex: "#F59E0B"))
 
                     Text("Помилка")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 11.5, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
 
                 case .idle:
