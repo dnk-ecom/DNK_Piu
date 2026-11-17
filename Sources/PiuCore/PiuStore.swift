@@ -193,6 +193,9 @@ public final class PiuStore: ObservableObject {
                 if hasNew && !self.muted {
                     NSSound(named: "Tink")?.play()
                 }
+                if hasNew {
+                    self.expanded = true
+                }
                 self.pending = loadedPending
 
                 // Update sessions keeping steps

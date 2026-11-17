@@ -17,14 +17,7 @@ public struct RootView: View {
     }
 
     public var body: some View {
-        Group {
-            if store.expanded {
-                ExpandedPanelView(store: store)
-            } else {
-                FloatingPillView(store: store)
-            }
-        }
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: store.expanded)
+        ExpandedPanelView(store: store)
     }
 }
 
@@ -347,11 +340,12 @@ public struct ExpandedPanelView: View {
                 .buttonStyle(.plain)
 
                 Button(action: { store.expanded = false }) {
-                    Image(systemName: "chevron.up.circle.fill")
+                    Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 14))
                         .foregroundColor(Color.white.opacity(0.6))
                 }
                 .buttonStyle(.plain)
+                .help("Сховати панель")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)

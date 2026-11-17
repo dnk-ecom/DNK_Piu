@@ -22,9 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func applicationDidFinishLaunching(_ notification: Notification) {
         store.start()
 
-        // 1. Configure main floating companion panel (Top-Right)
+        // 1. Configure main companion panel (Top-Right, hidden by default)
         panel = PiuPanel(
-            contentRect: NSRect(origin: .zero, size: Layout.pill),
+            contentRect: NSRect(origin: .zero, size: CGSize(width: Layout.panelWidth, height: Layout.maxPanelHeight)),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -39,8 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         panel.contentView = NSHostingView(rootView: RootView(store: store))
         panel.delegate = self
 
-        positionPanel()
-        panel.orderFrontRegardless()
+        // Keep completely hidden on launch so it does not obstruct the workspace
+        panel.orderOut(nil)
 
         // 2. Configure dedicated pop-up dictation pill (Bottom Center, Coucou-style)
         dictationPanel = DictationPillPanel()
@@ -50,8 +50,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
         // 4. Setup Menubar status item with dynamic delegate
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem?.button?.title = "Piu"
-        statusItem?.button?.image = NSImage(systemSymbolName: "cpu", accessibilityDescription: "DNK_Piu")
+        if let button = statusItem?.button {
+            button.title = ""
+            if let image = NSImage(systemSymbolName: "cpu", accessibilityDescription: "DNK_Piu") {
+                image.isTemplate = true
+                button.image = image
+            }
+        }
 
         let menu = NSMenu()
         menu.delegate = self
@@ -84,6 +89,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func menuWillOpen(_ menu: NSMenu) {
         menu.removeAllItems()
 
+        // Primary Toggle Action
+        let toggleTitle = store.expanded ? "Сховати панель DNK_Piu" : "Відкрити панель DNK_Piu"
+        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleVisible), keyEquivalent: "p")
+        toggleItem.target = self
+        menu.addItem(toggleItem)
+        menu.addItem(.separator())
+
         // TOP SECTION IN MENU: Recent dictated texts
         if !store.dictation.history.isEmpty {
             let header = NSMenuItem(title: "🎙️ Надиктовано (останні):", action: nil, keyEquivalent: "")
@@ -100,12 +112,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             menu.addItem(.separator())
         }
 
-        let toggleItem = NSMenuItem(title: "Toggle DNK_Piu Widget", action: #selector(toggleVisible), keyEquivalent: "p")
-        toggleItem.target = self
-        menu.addItem(toggleItem)
-
         let dictateItem = NSMenuItem(
-            title: "Dictate Voice (\(hotKey.activePreset.displayName))",
+            title: "Диктувати голосом (\(hotKey.activePreset.displayName))",
             action: #selector(toggleDictate),
             keyEquivalent: "d"
         )
@@ -160,8 +168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private func positionPanel() {
         guard let screen = panel?.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         let visible = screen.visibleFrame
-        let targetWidth: CGFloat = store.expanded ? Layout.panelWidth : Layout.pill.width
-        let targetHeight: CGFloat = store.expanded ? min(Layout.maxPanelHeight, visible.height - 40) : Layout.pill.height
+        let targetWidth: CGFloat = Layout.panelWidth
+        let targetHeight: CGFloat = min(Layout.maxPanelHeight, visible.height - 40)
 
         let desiredX = visible.maxX - targetWidth - margin
         let desiredY = visible.maxY - targetHeight - topMargin
@@ -173,10 +181,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     private func fit(expanded: Bool) {
+        if !expanded {
+            panel.orderOut(nil)
+            return
+        }
+
         guard let screen = panel?.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         let visible = screen.visibleFrame
-        let targetWidth: CGFloat = expanded ? Layout.panelWidth : Layout.pill.width
-        let targetHeight: CGFloat = expanded ? min(Layout.maxPanelHeight, visible.height - 40) : Layout.pill.height
+        let targetWidth: CGFloat = Layout.panelWidth
+        let targetHeight: CGFloat = min(Layout.maxPanelHeight, visible.height - 40)
 
         // Explicitly anchor to top-right of visible frame with strict clamping inside screen borders
         let desiredX = visible.maxX - targetWidth - margin
@@ -186,14 +199,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let clampedY = min(max(desiredY, visible.minY + margin), visible.maxY - targetHeight - topMargin)
 
         panel.setFrame(NSRect(x: clampedX, y: clampedY, width: targetWidth, height: targetHeight), display: true, animate: true)
+        panel.orderFrontRegardless()
     }
 
     @objc private func toggleVisible() {
-        if panel.isVisible {
-            panel.orderOut(nil)
-        } else {
-            panel.orderFrontRegardless()
-        }
+        store.expanded.toggle()
     }
 
     @objc private func toggleDictate() {
