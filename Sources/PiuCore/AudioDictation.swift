@@ -400,9 +400,9 @@ public enum FlowPaste {
         return isTrusted
     }
 
-    /// True 4-step hardware keyboard event sequence: Command Down -> V Down -> V Up -> Command Up.
+    /// True 4-step hardware keyboard event sequence: Command Down -> V Down -> 20ms -> V Up -> Command Up.
     private static func postCmdV(into targetApp: NSRunningApplication? = nil, isTrusted: Bool = true) {
-        log("postCmdV: executing 4-step sequence into \(targetApp?.bundleIdentifier ?? "activeWindow")...")
+        log("postCmdV: executing 4-step sequence into \(targetApp?.bundleIdentifier ?? "activeWindow")... isTrusted=\(isTrusted)")
         let source = CGEventSource(stateID: .combinedSessionState)
         let cmdKey: CGKeyCode = 0x37 // Left Command
         let vKey = vKeyCode()
@@ -420,21 +420,17 @@ public enum FlowPaste {
         vUp.flags = .maskCommand
         cmdUp.flags = []
 
-        // 1. Post to hardware HID event tap (Universal macOS WindowServer routing)
+        // Post Command Down and V Down to system HID tap
         cmdDown.post(tap: .cghidEventTap)
         vDown.post(tap: .cghidEventTap)
-        vUp.post(tap: .cghidEventTap)
-        cmdUp.post(tap: .cghidEventTap)
 
-        // 2. Also post directly to target application PID if known to guarantee delivery
-        if let pid = targetApp?.processIdentifier {
-            cmdDown.postToPid(pid)
-            vDown.postToPid(pid)
-            vUp.postToPid(pid)
-            cmdUp.postToPid(pid)
+        // Realistic 20ms dwell time before releasing keys so window manager processes key combo
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+            vUp.post(tap: .cghidEventTap)
+            cmdUp.post(tap: .cghidEventTap)
         }
 
-        // 3. AppleScript fallback if Accessibility is not granted
+        // AppleScript fallback if Accessibility is not granted
         if !isTrusted {
             log("postCmdV: Accessibility permission missing, executing System Events AppleScript fallback...")
             let scriptSource = "tell application \"System Events\" to keystroke \"v\" using command down"

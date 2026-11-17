@@ -37,8 +37,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-echo "🔐 Applying Ad-hoc code signature with bundle id and stable designated requirement..."
-codesign --force --deep -s - -i com.dnk.piu -r='designated => identifier "com.dnk.piu"' "$APP"
+echo "🔐 Signing with persistent DNK Piu Local Signing certificate..."
+codesign --force --deep -s "DNK Piu Local Signing" "$APP"
 
 echo "🔗 Setting up runtime hooks in $BIN..."
 mkdir -p "$BIN" "$HOME/.dnk_runtime/piu/pending" "$HOME/.dnk_runtime/piu/responses" "$HOME/.dnk_runtime/piu/sessions"
