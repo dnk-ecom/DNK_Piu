@@ -25,9 +25,15 @@ struct AstryxMenuHeaderView: View {
                 .shadow(color: swallowColor.opacity(0.45), radius: 3)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("DNK_Piu")
-                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                HStack(spacing: 5) {
+                    Text("DNK_Piu")
+                        .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text("v\(DNKPiuVersion.current)")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.35))
+                }
 
                 Text(statusSubtitle)
                     .font(.system(size: 10, weight: .medium))
@@ -276,6 +282,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             accessibilityItem.image = icon
         }
         menu.addItem(accessibilityItem)
+
+        // 8. Version information
+        let versionItem = NSMenuItem(title: "DNK_Piu v\(DNKPiuVersion.current)", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        if let icon = NSImage(systemSymbolName: "info.circle", accessibilityDescription: nil) {
+            versionItem.image = icon
+        }
+        menu.addItem(versionItem)
 
         menu.addItem(.separator())
         let quitItem = NSMenuItem(title: "Вийти з DNK_Piu", action: #selector(quit), keyEquivalent: "q")

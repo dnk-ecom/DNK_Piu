@@ -4,6 +4,12 @@ import Carbon
 import Foundation
 
 /// High-velocity voice dictation engine powered by Google Cloud Vertex AI (Gemini 3.8 Flash Multimodal Audio).
+public enum DNKPiuVersion {
+    public static let current = "0.1.0"
+    public static let build = "1"
+    public static let releaseName = "Sovereign Whisper"
+}
+
 public enum DictationPhase: Equatable {
     case idle
     case listening(isLocked: Bool)

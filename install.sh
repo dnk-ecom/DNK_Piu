@@ -31,7 +31,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>com.dnk.piu</string>
   <key>CFBundleExecutable</key><string>DNKPiu</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0.0</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleIconName</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
@@ -55,5 +56,5 @@ if [[ -f "$ROOT/hooks/piu_history.py" ]]; then
   ln -sf "$BIN/piu_history.py" "$HOME/.dnk_runtime/bin/piu-history"
 fi
 
-echo "✅ DNK_Piu v1.0.0 successfully installed to $APP"
+echo "✅ DNK_Piu v0.1.0 successfully installed to $APP"
 echo "👉 Launch with: open -a '$APP'"
