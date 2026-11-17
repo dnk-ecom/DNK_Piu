@@ -2,11 +2,11 @@ import AppKit
 import PiuCore
 import SwiftUI
 
-/// Floating, non-activating pop-up pill panel placed at the bottom center of the active screen.
+/// Floating pop-up pill panel placed at bottom center of the active screen (Coucou FlowPill).
 final class DictationPillPanel: NSPanel {
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 280, height: 48),
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: 90),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -17,7 +17,7 @@ final class DictationPillPanel: NSPanel {
         self.hasShadow = false
         self.hidesOnDeactivate = false
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        self.contentView = NSHostingView(rootView: DictationPillView())
+        self.contentView = NSHostingView(rootView: DictationPillContainerView())
     }
 
     override var canBecomeKey: Bool { false }
@@ -27,9 +27,9 @@ final class DictationPillPanel: NSPanel {
         let mouseLocation = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
         let visible = screen.visibleFrame
-        let size = CGSize(width: 280, height: 48)
+        let size = CGSize(width: 340, height: 90)
         let x = visible.midX - (size.width / 2.0)
-        let y = visible.minY + 28.0
+        let y = visible.minY + 24.0
         self.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: true)
     }
 
@@ -38,7 +38,7 @@ final class DictationPillPanel: NSPanel {
         self.alphaValue = 0.0
         self.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.22
+            ctx.duration = 0.20
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             self.animator().alphaValue = 1.0
         }
@@ -46,7 +46,7 @@ final class DictationPillPanel: NSPanel {
 
     func hideAnimated() {
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.25
+            ctx.duration = 0.24
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             self.animator().alphaValue = 0.0
         }, completionHandler: {
@@ -55,63 +55,91 @@ final class DictationPillPanel: NSPanel {
     }
 }
 
-/// Dynamic soundwave visualizer responding to microphone volume levels.
-struct WaveformBarsView: View {
-    let levels: [Float]
-    let isThinking: Bool
+/// Container that hosts both the floating speech bubble and the bottom capsule pill.
+struct DictationPillContainerView: View {
+    @ObservedObject private var dictation = AudioDictation.shared
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-            HStack(spacing: 3.2) {
-                ForEach(0..<levels.count, id: \.self) { i in
-                    let height: CGFloat = {
-                        if isThinking {
-                            // Organic wave ripple when transcribing with Gemini
-                            let wave = max(0.15, sin(t * 8.0 - Double(i) * 0.75))
-                            return 4.0 + 18.0 * CGFloat(wave)
-                        } else {
-                            let level = levels.indices.contains(i) ? levels[i] : 0.15
-                            return max(4.0, min(24.0, CGFloat(level) * 22.0))
-                        }
-                    }()
+        VStack(spacing: 6) {
+            // Speech Bubble / Announcement above the pill
+            if case .done(let text) = dictation.phase, !text.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(Color(hex: "#10B981"))
+                        .font(.system(size: 11, weight: .bold))
 
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: isThinking ? [Color(hex: "#C084FC"), Color(hex: "#67E8F9")] : [Color.white, Color(hex: "#A855F7")],
-                                startPoint: .bottom,
-                                endPoint: .top
-                            )
-                        )
-                        .frame(width: 3.2, height: height)
+                    Text(text.count > 36 ? "\(text.prefix(36))..." : text)
+                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                        .foregroundColor(Color.white.opacity(0.95))
+                        .lineLimit(1)
+
+                    Text("Вставлено")
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(Color(hex: "#10B981"))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: "#10B981").opacity(0.18))
+                        .clipShape(Capsule())
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color(hex: "#0A0B0E").opacity(0.96))
+                        .shadow(color: Color.black.opacity(0.4), radius: 8, y: 3)
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+                )
+                .transition(.scale(scale: 0.85).combined(with: .opacity))
+            } else if case .failed(let err) = dictation.phase {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundColor(Color(hex: "#F59E0B"))
+                        .font(.system(size: 11, weight: .bold))
+                    Text(err)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color(hex: "#0A0B0E").opacity(0.96)))
+                .overlay(Capsule().strokeBorder(Color(hex: "#F59E0B").opacity(0.4), lineWidth: 1))
             }
-            .frame(height: 26)
+
+            // Bottom Jet-Black Capsule Pill (Coucou FlowPill)
+            CoucouFlowPillView()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: dictation.phase)
     }
 }
 
-/// The pop-up dictation pill UI view matching Coucou's FlowPill design.
-struct DictationPillView: View {
+/// The sleek jet-black pill with 9 dancing audio dots, matching Coucou v0.6.0.
+struct CoucouFlowPillView: View {
     @ObservedObject private var dictation = AudioDictation.shared
 
     var body: some View {
         ZStack {
-            // Frosted dark pill capsule
+            // Coucou Jet Black Capsule Background
             Capsule()
-                .fill(Color(red: 0.07, green: 0.07, blue: 0.10).opacity(0.92))
+                .fill(Color(hex: "#0A0B0E").opacity(0.96))
+
+            // Thin Frosted Border
             Capsule()
                 .strokeBorder(
                     LinearGradient(
-                        colors: [Color(hex: "#A855F7").opacity(0.8), Color(hex: "#06B6D4").opacity(0.8)],
+                        colors: isThinking
+                            ? [Color(hex: "#C084FC"), Color(hex: "#22D3EE")]
+                            : [Color.white.opacity(0.20), Color.white.opacity(0.12)],
                         startPoint: .leading,
                         endPoint: .trailing
                     ),
-                    lineWidth: 1.2
+                    lineWidth: 1.0
                 )
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 switch dictation.phase {
                 case .listening(let isLocked):
                     if isLocked {
@@ -119,33 +147,31 @@ struct DictationPillView: View {
                             dictation.cancel()
                         } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.system(size: 9.5, weight: .heavy))
                                 .foregroundColor(.white.opacity(0.7))
-                                .frame(width: 22, height: 22)
+                                .frame(width: 20, height: 20)
                                 .background(Circle().fill(Color.white.opacity(0.12)))
                         }
                         .buttonStyle(.plain)
                     } else {
-                        Circle()
-                            .fill(Color(hex: "#EF4444"))
-                            .frame(width: 8, height: 8)
-                            .shadow(color: Color(hex: "#EF4444").opacity(0.8), radius: 4)
+                        // Glowing Gemini AI Star
+                        Image(systemName: "sparkle")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(Color(hex: "#22D3EE"))
+                            .shadow(color: Color(hex: "#22D3EE").opacity(0.7), radius: 3)
                     }
 
-                    WaveformBarsView(levels: dictation.audioLevels, isThinking: false)
-
-                    Text(isLocked ? "Hands-free" : "Слухаю...")
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundColor(Color.white.opacity(0.95))
+                    // 9 Coucou Dancing Dots
+                    CoucouNineDotsView(levels: dictation.audioLevels, isThinking: false)
 
                     if isLocked {
                         Button {
                             dictation.stopAndTranscribe()
                         } label: {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.system(size: 9.5, weight: .heavy))
                                 .foregroundColor(.black)
-                                .frame(width: 22, height: 22)
+                                .frame(width: 20, height: 20)
                                 .background(Circle().fill(Color(hex: "#10B981")))
                         }
                         .buttonStyle(.plain)
@@ -153,40 +179,29 @@ struct DictationPillView: View {
 
                 case .thinking:
                     Image(systemName: "sparkles")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Color(hex: "#C084FC"))
 
-                    WaveformBarsView(levels: dictation.audioLevels, isThinking: true)
+                    // 9 Ripple Dots during Gemini 3.8 Flash transcription
+                    CoucouNineDotsView(levels: dictation.audioLevels, isThinking: true)
 
-                    Text("Розпізнаю (Gemini 3.8)...")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundColor(Color.white.opacity(0.92))
-
-                case .done(let text):
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 15, weight: .bold))
+                case .done:
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Color(hex: "#10B981"))
 
-                    Text("Вставлено!")
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundColor(Color.white)
+                    Text("Готово")
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
 
-                    if !text.isEmpty {
-                        Text("(\(text.prefix(20))...)")
-                            .font(.system(size: 11, weight: .regular))
-                            .foregroundColor(Color.white.opacity(0.6))
-                            .lineLimit(1)
-                    }
-
-                case .failed(let msg):
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .font(.system(size: 14, weight: .bold))
+                case .failed:
+                    Image(systemName: "mic.slash.fill")
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Color(hex: "#F59E0B"))
 
-                    Text(msg)
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.85))
-                        .lineLimit(1)
+                    Text("Помилка")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
 
                 case .idle:
                     EmptyView()
@@ -194,7 +209,57 @@ struct DictationPillView: View {
             }
             .padding(.horizontal, 14)
         }
-        .frame(width: 270, height: 44)
-        .shadow(color: Color.black.opacity(0.4), radius: 10, y: 4)
+        .frame(width: pillWidth, height: 34)
+        .shadow(color: Color.black.opacity(0.45), radius: 12, y: 4)
+    }
+
+    private var isThinking: Bool {
+        if case .thinking = dictation.phase { return true }
+        return false
+    }
+
+    private var pillWidth: CGFloat {
+        switch dictation.phase {
+        case .listening(let isLocked): return isLocked ? 168 : 138
+        case .thinking: return 128
+        case .done: return 110
+        case .failed: return 110
+        case .idle: return 80
+        }
+    }
+}
+
+/// Exactly 9 dots rising and falling with voice audio bands (Coucou FlowBands).
+struct CoucouNineDotsView: View {
+    let levels: [Float]
+    let isThinking: Bool
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            HStack(alignment: .center, spacing: 3.2) {
+                ForEach(0..<9, id: \.self) { i in
+                    let height: CGFloat = {
+                        if isThinking {
+                            // Coucou sine-wave wave equation: 0.10 + 0.22 * sin(...)
+                            let wave = max(0.0, sin(t * 7.5 - Double(i) * 0.75))
+                            return 3.4 + 14.0 * CGFloat(wave)
+                        } else {
+                            let level = levels.indices.contains(i) ? CGFloat(levels[i]) : 0.1
+                            return max(3.4, min(18.0, 3.4 + 14.6 * level))
+                        }
+                    }()
+
+                    Capsule()
+                        .fill(
+                            isThinking
+                                ? Color(hex: "#C084FC").opacity(0.95)
+                                : Color.white.opacity(0.94)
+                        )
+                        .frame(width: 3.4, height: height)
+                }
+            }
+            .frame(height: 20)
+        }
     }
 }

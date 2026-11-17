@@ -42,7 +42,8 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
     @Published public private(set) var isRecording = false
     @Published public private(set) var isProcessing = false
     @Published public private(set) var phase: DictationPhase = .idle
-    @Published public private(set) var audioLevels: [Float] = [0.12, 0.18, 0.25, 0.4, 0.25, 0.18, 0.12]
+    /// Exactly 9 bands matching Coucou's FlowBands.count
+    @Published public private(set) var audioLevels: [Float] = [Float](repeating: 0.1, count: 9)
     @Published public var lastTranscript: String = ""
     @Published public var history: [DictationItem] = []
     @Published public var errorMessage: String? = nil
@@ -77,7 +78,7 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
         UserDefaults.standard.set(lastTranscript, forKey: "piu_last_transcript")
     }
 
-    /// Toggles or starts voice dictation.
+    /// Toggles voice dictation.
     public func toggle() {
         if isRecording {
             stopAndTranscribe()
@@ -168,20 +169,14 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             self.phase = .thinking
         }
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-            defer {
-                DispatchQueue.main.async {
-                    self.isProcessing = false
-                }
-            }
-
+        Task {
             guard let audioData = try? Data(contentsOf: self.recordingURL), !audioData.isEmpty else {
-                DispatchQueue.main.async {
-                    self.errorMessage = "No audio data recorded"
+                await MainActor.run {
+                    self.isProcessing = false
+                    self.errorMessage = "No audio recorded"
                     self.phase = .failed("No audio")
                     completion?(nil)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
                         if case .failed = self.phase { self.phase = .idle }
                     }
                 }
@@ -192,93 +187,81 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             let payload: [String: Any] = [
                 "audio_base64": base64Audio,
                 "mime_type": "audio/wav",
-                "prompt": "Транскрибуй мову розробника (uk-UA / en-US). Зберігай технічні назви та сленг в оригіналі (Shopify, Clyro, Antigravity, commit, branch, PR, Swift, Python, Coucou, Huddle). Автоматично розставляй розділові знаки. Повертай ВИКЛЮЧНО розпізнаний текст без лапок чи коментарів."
+                "prompt": "Транскрибуй мову розробника (uk-UA / en-US). Зберігай технічні терміни та назви в оригіналі (Shopify, Clyro, Antigravity, commit, branch, PR, Swift, Python, Coucou, Huddle). Автоматично розставляй розділові знаки. Повертай ВИКЛЮЧНО розпізнаний текст без лапок чи коментарів."
             ]
 
             var request = URLRequest(url: self.bridgeURL)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.timeoutInterval = 15.0
+            request.timeoutInterval = 45.0 // Generous timeout to avoid connection cancellation
 
             do {
                 request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-            } catch {
-                DispatchQueue.main.async {
-                    self.errorMessage = "Serialization error: \(error.localizedDescription)"
-                    self.phase = .failed("Payload error")
-                    completion?(nil)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        if case .failed = self.phase { self.phase = .idle }
-                    }
-                }
-                return
-            }
+                let (data, response) = try await URLSession.shared.data(for: request)
 
-            let semaphore = DispatchSemaphore(value: 0)
-            var returnedText: String? = nil
-
-            let task = URLSession.shared.dataTask(with: request) { data, response, error in
-                defer { semaphore.signal() }
-
-                if let error = error {
-                    DispatchQueue.main.async {
-                        self.errorMessage = "Bridge request failed: \(error.localizedDescription)"
-                    }
-                    return
-                }
-
-                guard let data = data,
+                guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let text = json["text"] as? String else {
-                    DispatchQueue.main.async {
-                        self.errorMessage = "Invalid response from Vertex AI audio bridge"
+                    let errStr = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String ?? "Invalid bridge response"
+                    await MainActor.run {
+                        self.isProcessing = false
+                        self.errorMessage = errStr
+                        self.phase = .failed(errStr)
+                        completion?(nil)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            if case .failed = self.phase { self.phase = .idle }
+                        }
                     }
                     return
                 }
 
-                returnedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            task.resume()
-            _ = semaphore.wait(timeout: .now() + 16.0)
+                let transcript = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            if let transcript = returnedText, !transcript.isEmpty {
-                DispatchQueue.main.async {
+                await MainActor.run {
+                    self.isProcessing = false
+                    guard !transcript.isEmpty else {
+                        self.phase = .failed("Empty transcript")
+                        completion?(nil)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            if case .failed = self.phase { self.phase = .idle }
+                        }
+                        return
+                    }
+
                     self.lastTranscript = transcript
                     let newItem = DictationItem(text: transcript)
                     self.history.insert(newItem, at: 0)
-                    if self.history.count > 25 {
+                    if self.history.count > 30 {
                         self.history.removeLast()
                     }
                     self.saveHistory()
 
                     self.phase = .done(transcript)
 
-                    // Always copy to clipboard AND automatically paste at cursor if enabled
+                    // Always copy to clipboard AND automatically paste at cursor
                     if insertAutomatically {
                         FlowPaste.insert(transcript)
                     } else {
                         FlowPaste.copyToClipboard(transcript)
                     }
 
-                    // Optional pleasant completion chime
                     NSSound(named: "Pop")?.play()
-
                     completion?(transcript)
 
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                         if case .done = self.phase {
                             self.phase = .idle
                         }
                     }
                 }
-            } else {
-                DispatchQueue.main.async {
-                    self.phase = .failed(self.errorMessage ?? "Empty transcript")
+            } catch {
+                await MainActor.run {
+                    self.isProcessing = false
+                    self.errorMessage = "Bridge request error: \(error.localizedDescription)"
+                    self.phase = .failed(self.errorMessage ?? "Error")
                     completion?(nil)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-                        if case .failed = self.phase {
-                            self.phase = .idle
-                        }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        if case .failed = self.phase { self.phase = .idle }
                     }
                 }
             }
@@ -287,7 +270,7 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
 
     private func startMetering() {
         meterTimer?.invalidate()
-        meterTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        meterTimer = Timer.scheduledTimer(withTimeInterval: 0.04, repeats: true) { [weak self] _ in
             guard let self = self, let recorder = self.recorder, recorder.isRecording else { return }
             recorder.updateMeters()
             let power = recorder.averagePower(forChannel: 0) // -160 to 0 dB
@@ -295,9 +278,9 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
 
             let t = Date().timeIntervalSinceReferenceDate
             var levels: [Float] = []
-            for i in 0..<7 {
-                let jitter = Float(sin(t * 12.0 + Double(i) * 1.3)) * 0.12
-                let val = max(0.08, min(1.0, normalized * (0.65 + Float(i % 3) * 0.18) + jitter))
+            for i in 0..<9 {
+                let jitter = Float(sin(t * 11.0 + Double(i) * 1.5)) * 0.12
+                let val = max(0.08, min(1.0, normalized * (0.60 + Float(i % 3) * 0.18) + jitter))
                 levels.append(val)
             }
             DispatchQueue.main.async {
@@ -309,7 +292,7 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
     private func stopMetering() {
         meterTimer?.invalidate()
         meterTimer = nil
-        audioLevels = [0.12, 0.18, 0.25, 0.4, 0.25, 0.18, 0.12]
+        audioLevels = [Float](repeating: 0.1, count: 9)
     }
 }
 
@@ -332,14 +315,13 @@ public enum FlowPaste {
         copyToClipboard(text)
 
         // 2. Accessibility Check:
-        // CGEvent posting requires Accessibility permissions (System Settings -> Privacy & Security -> Accessibility).
         guard AXIsProcessTrusted() else {
             // Text remains on clipboard for immediate manual ⌘V by the user.
             return
         }
 
-        // 3. Small 40ms dispatch delay to ensure user-released modifier keys are clear from macOS event tap
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) {
+        // 3. Small 50ms dispatch delay to ensure user-released modifier keys are clear from macOS event tap
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             let source = CGEventSource(stateID: .combinedSessionState)
             let v = vKeyCode()
 

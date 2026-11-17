@@ -28,7 +28,7 @@ public struct RootView: View {
     }
 }
 
-/// Compact floating pill showing active agents count & microphone button.
+/// Compact floating pill showing active agents count & microphone button (Coucou Island style).
 public struct FloatingPillView: View {
     @ObservedObject public var store: PiuStore
     @ObservedObject public var dictation = AudioDictation.shared
@@ -45,10 +45,11 @@ public struct FloatingPillView: View {
                     Circle()
                         .fill(pillStatusColor)
                         .frame(width: 8, height: 8)
+                        .shadow(color: pillStatusColor.opacity(0.6), radius: 3)
 
                     Text("DNK_Piu")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
+                        .foregroundColor(Color(hex: "#F5F6F8"))
 
                     if store.needsYouCount > 0 {
                         Text("\(store.needsYouCount)")
@@ -56,7 +57,7 @@ public struct FloatingPillView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
-                            .background(Color(red: 0.95, green: 0.35, blue: 0.25))
+                            .background(Color(hex: "#EF4444"))
                             .clipShape(Capsule())
                     }
                 }
@@ -69,16 +70,16 @@ public struct FloatingPillView: View {
             Button(action: { dictation.toggle() }) {
                 ZStack {
                     Circle()
-                        .fill(dictation.isRecording ? Color.red : Color.primary.opacity(0.08))
-                        .frame(width: 26, height: 26)
+                        .fill(dictation.isRecording ? Color(hex: "#EF4444") : Color.white.opacity(0.10))
+                        .frame(width: 24, height: 24)
 
                     if dictation.isProcessing {
                         ProgressView()
-                            .scaleEffect(0.6)
+                            .scaleEffect(0.55)
                     } else {
                         Image(systemName: dictation.isRecording ? "mic.fill" : "mic")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(dictation.isRecording ? .white : .primary)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(dictation.isRecording ? .white : Color(hex: "#22D3EE"))
                     }
                 }
             }
@@ -90,22 +91,22 @@ public struct FloatingPillView: View {
         .frame(width: Layout.pill.width, height: Layout.pill.height)
         .background(
             Capsule()
-                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.95))
-                .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 3)
+                .fill(Color(hex: "#0A0B0E").opacity(0.96))
+                .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 3)
         )
         .overlay(
             Capsule()
-                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
         )
     }
 
     private var pillStatusColor: Color {
-        if dictation.isRecording { return Color.red }
-        if store.needsYouCount > 0 { return Color(red: 0.95, green: 0.35, blue: 0.25) }
+        if dictation.isRecording { return Color(hex: "#EF4444") }
+        if store.needsYouCount > 0 { return Color(hex: "#F97316") }
         if store.sessions.contains(where: { store.activity($0) == .working }) {
-            return Color(red: 0.18, green: 0.83, blue: 0.75) // DNK Cyan
+            return Color(hex: "#22D3EE") // Coucou Cyan
         }
-        return Color(red: 0.75, green: 0.45, blue: 0.95) // DNK Purple
+        return Color(hex: "#C084FC") // Coucou Purple
     }
 }
 
@@ -120,10 +121,10 @@ public struct AccessibilityBanner: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Потрібен дозвіл Accessibility")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.primary)
+                    .foregroundColor(Color(hex: "#F5F6F8"))
                 Text("Для хоткеїв ⌥ та вставки ⌘V")
                     .font(.system(size: 9))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Color.white.opacity(0.65))
             }
 
             Spacer()
@@ -132,22 +133,22 @@ public struct AccessibilityBanner: View {
                 Text("Надати")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
                     .background(Color(hex: "#A855F7"))
-                    .cornerRadius(4)
+                    .cornerRadius(5)
             }
             .buttonStyle(.plain)
         }
         .padding(8)
         .background(Color(hex: "#F59E0B").opacity(0.12))
-        .cornerRadius(8)
+        .cornerRadius(10)
         .padding(.horizontal, 10)
         .padding(.top, 6)
     }
 }
 
-/// Top card displaying the latest transcribed text and dictation history.
+/// Top card displaying the latest transcribed text and dictation history (Coucou design).
 public struct DictationTopCard: View {
     @ObservedObject public var dictation = AudioDictation.shared
     @LocalState private var copiedId: UUID? = nil
@@ -160,34 +161,34 @@ public struct DictationTopCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 // Header with icon, label and history toggle
                 HStack(spacing: 6) {
-                    Image(systemName: "waveform.badge.mic")
-                        .foregroundColor(Color(hex: "#06B6D4"))
-                        .font(.system(size: 12, weight: .bold))
+                    Image(systemName: "sparkles")
+                        .foregroundColor(Color(hex: "#22D3EE"))
+                        .font(.system(size: 11, weight: .bold))
 
                     Text("Надиктовано (Gemini 3.8)")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
+                        .foregroundColor(Color(hex: "#F5F6F8"))
 
                     if let latest = dictation.history.first {
                         Text(latest.formattedTime)
                             .font(.system(size: 9))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Color.white.opacity(0.5))
                     }
 
                     Spacer()
 
                     if dictation.history.count > 1 {
                         Button(action: { showHistory.toggle() }) {
-                            HStack(spacing: 2) {
+                            HStack(spacing: 3) {
                                 Text("Історія (\(dictation.history.count))")
                                     .font(.system(size: 9, weight: .semibold))
                                 Image(systemName: showHistory ? "chevron.up" : "chevron.down")
                                     .font(.system(size: 8, weight: .bold))
                             }
-                            .foregroundColor(Color(hex: "#A855F7"))
+                            .foregroundColor(Color(hex: "#C084FC"))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color(hex: "#A855F7").opacity(0.12))
+                            .background(Color(hex: "#C084FC").opacity(0.15))
                             .cornerRadius(4)
                         }
                         .buttonStyle(.plain)
@@ -198,8 +199,8 @@ public struct DictationTopCard: View {
                 let latestItem = dictation.history.first ?? DictationItem(text: dictation.lastTranscript)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(latestItem.text)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.primary)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundColor(Color(hex: "#E8E9EC"))
                         .lineLimit(4)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -208,9 +209,7 @@ public struct DictationTopCard: View {
 
                         // Copy to clipboard button
                         Button(action: {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.declareTypes([.string], owner: nil)
-                            NSPasteboard.general.setString(latestItem.text, forType: .string)
+                            FlowPaste.copyToClipboard(latestItem.text)
                             copiedId = latestItem.id
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                                 if copiedId == latestItem.id { copiedId = nil }
@@ -222,11 +221,11 @@ public struct DictationTopCard: View {
                                 Text(copiedId == latestItem.id ? "Скопійовано!" : "Скопіювати")
                                     .font(.system(size: 9, weight: .bold))
                             }
-                            .foregroundColor(copiedId == latestItem.id ? .green : Color(hex: "#06B6D4"))
-                            .padding(.horizontal, 7)
+                            .foregroundColor(copiedId == latestItem.id ? Color(hex: "#10B981") : Color(hex: "#22D3EE"))
+                            .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(Color.primary.opacity(0.06))
-                            .cornerRadius(4)
+                            .background(Color.white.opacity(0.08))
+                            .cornerRadius(5)
                         }
                         .buttonStyle(.plain)
 
@@ -241,7 +240,7 @@ public struct DictationTopCard: View {
                                     .font(.system(size: 9, weight: .bold))
                             }
                             .foregroundColor(.white)
-                            .padding(.horizontal, 8)
+                            .padding(.horizontal, 9)
                             .padding(.vertical, 3)
                             .background(
                                 LinearGradient(
@@ -250,14 +249,14 @@ public struct DictationTopCard: View {
                                     endPoint: .trailing
                                 )
                             )
-                            .cornerRadius(4)
+                            .cornerRadius(5)
                         }
                         .buttonStyle(.plain)
                         .help("Insert text into active cursor position")
                     }
                 }
                 .padding(8)
-                .background(Color(hex: "#A855F7").opacity(0.08))
+                .background(Color.white.opacity(0.05))
                 .cornerRadius(8)
 
                 // History Dropdown
@@ -267,23 +266,21 @@ public struct DictationTopCard: View {
                             HStack(alignment: .center, spacing: 6) {
                                 Text(prevItem.text)
                                     .font(.system(size: 10))
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(Color.white.opacity(0.75))
                                     .lineLimit(1)
 
                                 Spacer()
 
                                 Text(prevItem.formattedTime)
                                     .font(.system(size: 8))
-                                    .foregroundColor(.secondary.opacity(0.7))
+                                    .foregroundColor(Color.white.opacity(0.4))
 
                                 Button(action: {
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.declareTypes([.string], owner: nil)
-                                    NSPasteboard.general.setString(prevItem.text, forType: .string)
+                                    FlowPaste.copyToClipboard(prevItem.text)
                                 }) {
                                     Image(systemName: "doc.on.doc")
                                         .font(.system(size: 8))
-                                        .foregroundColor(Color(hex: "#A855F7"))
+                                        .foregroundColor(Color(hex: "#C084FC"))
                                 }
                                 .buttonStyle(.plain)
 
@@ -292,13 +289,13 @@ public struct DictationTopCard: View {
                                 }) {
                                     Image(systemName: "arrow.right.doc.on.clipboard")
                                         .font(.system(size: 8))
-                                        .foregroundColor(Color(hex: "#06B6D4"))
+                                        .foregroundColor(Color(hex: "#22D3EE"))
                                 }
                                 .buttonStyle(.plain)
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 4)
-                            .background(Color.primary.opacity(0.04))
+                            .background(Color.white.opacity(0.03))
                             .cornerRadius(5)
                         }
                     }
@@ -306,12 +303,12 @@ public struct DictationTopCard: View {
             }
             .padding(10)
             .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.7))
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.04))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color(hex: "#A855F7").opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
             )
             .padding(.horizontal, 10)
             .padding(.top, 8)
@@ -319,7 +316,7 @@ public struct DictationTopCard: View {
     }
 }
 
-/// Expanded panel view displaying agents list and approval cards.
+/// Expanded panel view displaying agents list and approval cards (Coucou Island container).
 public struct ExpandedPanelView: View {
     @ObservedObject public var store: PiuStore
 
@@ -332,10 +329,12 @@ public struct ExpandedPanelView: View {
             // Header
             HStack {
                 HStack(spacing: 6) {
-                    Image(systemName: "cpu")
-                        .foregroundColor(Color(red: 0.18, green: 0.83, blue: 0.75))
+                    Image(systemName: "sparkle")
+                        .foregroundColor(Color(hex: "#22D3EE"))
+                        .font(.system(size: 13, weight: .bold))
                     Text("DNK_Piu")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(hex: "#F5F6F8"))
                 }
 
                 Spacer()
@@ -343,29 +342,29 @@ public struct ExpandedPanelView: View {
                 Button(action: { store.muted.toggle() }) {
                     Image(systemName: store.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                         .font(.system(size: 11))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Color.white.opacity(0.6))
                 }
                 .buttonStyle(.plain)
 
                 Button(action: { store.expanded = false }) {
                     Image(systemName: "chevron.up.circle.fill")
                         .font(.system(size: 14))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Color.white.opacity(0.6))
                 }
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(Color(nsColor: .windowBackgroundColor).opacity(0.6))
+            .background(Color.white.opacity(0.03))
 
-            Divider()
+            Divider().background(Color.white.opacity(0.08))
 
             // 1. Accessibility warning banner if not yet granted
             if !DictationHotKey.isAccessibilityGranted() {
                 AccessibilityBanner()
             }
 
-            // 2. TOP SECTION: Dictated text list (At the very top of the menu/panel!)
+            // 2. TOP SECTION: Dictated text list (Coucou style)
             DictationTopCard()
 
             // 3. Pending Approval Requests
@@ -383,15 +382,15 @@ public struct ExpandedPanelView: View {
                 VStack(spacing: 6) {
                     if store.sessions.isEmpty {
                         VStack(spacing: 6) {
-                            Image(systemName: "person.wave.2")
+                            Image(systemName: "sparkles")
                                 .font(.system(size: 20))
-                                .foregroundColor(.secondary)
-                            Text("No active agents")
+                                .foregroundColor(Color.white.opacity(0.3))
+                            Text("Немає активних агентів")
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.secondary)
-                            Text("Start Antigravity, Gerych or Claude Code to monitor")
+                                .foregroundColor(Color.white.opacity(0.6))
+                            Text("Antigravity, Gerych або Denchik")
                                 .font(.system(size: 9))
-                                .foregroundColor(.secondary.opacity(0.8))
+                                .foregroundColor(Color.white.opacity(0.4))
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: Layout.emptyListHeight)
@@ -405,20 +404,20 @@ public struct ExpandedPanelView: View {
             }
             .frame(maxHeight: Layout.maxPanelHeight)
 
-            Divider()
+            Divider().background(Color.white.opacity(0.08))
 
             // Footer with dictation quick bar
             FooterDictationBar()
         }
         .frame(width: Layout.panelWidth)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color(nsColor: .windowBackgroundColor))
-                .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 5)
+            RoundedRectangle(cornerRadius: 22)
+                .fill(Color(hex: "#0A0B0E").opacity(0.96))
+                .shadow(color: Color.black.opacity(0.55), radius: 24, x: 0, y: 8)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
         )
     }
 }
@@ -434,12 +433,13 @@ public struct SessionRowView: View {
 
     public var body: some View {
         HStack(spacing: 10) {
-            BuddyView(traits: session.buddy, activity: store.activity(session), size: 30)
+            BuddyView(traits: session.buddy, activity: store.activity(session), size: 28)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(session.displayName)
                         .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color(hex: "#F5F6F8"))
                         .lineLimit(1)
 
                     Text(session.info.agentKind.displayName)
@@ -453,7 +453,7 @@ public struct SessionRowView: View {
 
                 Text(session.currentStep)
                     .font(.system(size: 10))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Color.white.opacity(0.65))
                     .lineLimit(1)
             }
 
@@ -463,13 +463,13 @@ public struct SessionRowView: View {
             Button(action: { Jumper.activate(pid: session.info.pid, cwd: session.info.cwd) }) {
                 Image(systemName: "arrow.up.right.square")
                     .font(.system(size: 13))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Color.white.opacity(0.5))
             }
             .buttonStyle(.plain)
             .help("Focus agent session in terminal/editor")
         }
         .padding(8)
-        .background(Color.primary.opacity(0.04))
+        .background(Color.white.opacity(0.03))
         .cornerRadius(8)
     }
 }
@@ -483,12 +483,12 @@ public struct FooterDictationBar: View {
     public var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "sparkles")
-                .foregroundColor(Color(red: 0.18, green: 0.83, blue: 0.75))
+                .foregroundColor(Color(hex: "#22D3EE"))
                 .font(.system(size: 11))
 
             Text(dictation.isRecording ? "Запис... (Відпустіть \(hotKey.activePreset.symbol))" : (dictation.lastTranscript.isEmpty ? "Хоткей: \(hotKey.activePreset.displayName)" : dictation.lastTranscript))
                 .font(.system(size: 10, weight: dictation.isRecording ? .semibold : .regular))
-                .foregroundColor(dictation.isRecording ? .red : .secondary)
+                .foregroundColor(dictation.isRecording ? Color(hex: "#EF4444") : Color.white.opacity(0.65))
                 .lineLimit(1)
 
             Spacer()
@@ -496,20 +496,21 @@ public struct FooterDictationBar: View {
             Button(action: { dictation.toggle() }) {
                 HStack(spacing: 4) {
                     Image(systemName: dictation.isRecording ? "stop.circle.fill" : "mic.fill")
-                        .foregroundColor(dictation.isRecording ? .red : .primary)
+                        .foregroundColor(dictation.isRecording ? Color(hex: "#EF4444") : Color(hex: "#22D3EE"))
                     Text(dictation.isRecording ? "Стоп" : "Диктувати")
                         .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Color(hex: "#F5F6F8"))
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.08))
+                .background(Color.white.opacity(0.08))
                 .cornerRadius(5)
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color(nsColor: .windowBackgroundColor).opacity(0.7))
+        .background(Color.white.opacity(0.02))
     }
 }
 
