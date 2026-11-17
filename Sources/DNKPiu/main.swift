@@ -11,10 +11,10 @@ struct AstryxMenuHeaderView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            // Swallow Icon Badge (Shopify / Astryx Identity)
+            // Swallow Icon Badge (Shopify Identity with Dynamic State Color)
             Image(systemName: "swift")
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(AstryxTheme.swallowGradient)
+                .foregroundColor(swallowColor)
                 .scaleEffect(x: -1, y: 1)
                 .frame(width: 26, height: 26)
                 .background(
@@ -22,6 +22,7 @@ struct AstryxMenuHeaderView: View {
                         .fill(AstryxTheme.elevated)
                         .overlay(Circle().stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth))
                 )
+                .shadow(color: swallowColor.opacity(0.45), radius: 3)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
@@ -56,6 +57,16 @@ struct AstryxMenuHeaderView: View {
         .background(AstryxTheme.panel)
     }
 
+    private var swallowColor: Color {
+        switch dictation.phase {
+        case .listening: return Color(hex: "#EF4444")
+        case .thinking: return Color(hex: "#3B82F6")
+        case .done: return AstryxTheme.shopifyMint
+        case .failed: return Color(hex: "#EF4444")
+        case .idle: return AstryxTheme.shopifyMint
+        }
+    }
+
     private var statusSubtitle: String {
         switch dictation.phase {
         case .listening(let locked):
@@ -73,11 +84,11 @@ struct AstryxMenuHeaderView: View {
 
     private var statusIndicatorColor: Color {
         switch dictation.phase {
-        case .listening: return AstryxTheme.red
-        case .thinking: return AstryxTheme.purple
-        case .done: return AstryxTheme.emerald
-        case .failed: return AstryxTheme.red
-        case .idle: return AstryxTheme.emerald
+        case .listening: return Color(hex: "#EF4444")
+        case .thinking: return Color(hex: "#3B82F6")
+        case .done: return AstryxTheme.shopifyMint
+        case .failed: return Color(hex: "#EF4444")
+        case .idle: return AstryxTheme.shopifyMint
         }
     }
 }
@@ -99,7 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // 3. Setup Menubar status item with direct click toggle and right-click context menu
         setupStatusBar()
 
-        // 4. React to Dictation Phase to show/hide the pop-up capsule pill
+        // 4. React to Dictation Phase to show/hide the pop-up capsule pill and update status icon
         dictation.$phase
             .receive(on: DispatchQueue.main)
             .sink { [weak self] phase in
@@ -111,8 +122,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         self.dictationPanel.showAnimated()
                     }
                 }
+                self.updateStatusBarIcon(for: phase)
             }
             .store(in: &cancellables)
+    }
+
+    private func updateStatusBarIcon(for phase: DictationPhase) {
+        guard let button = statusItem?.button else { return }
+        switch phase {
+        case .listening:
+            button.contentTintColor = NSColor(hex: "#EF4444")
+        case .thinking:
+            button.contentTintColor = NSColor(hex: "#3B82F6")
+        case .done:
+            button.contentTintColor = NSColor(hex: "#36F4A4")
+        default:
+            button.contentTintColor = nil
+        }
     }
 
     private func setupStatusBar() {

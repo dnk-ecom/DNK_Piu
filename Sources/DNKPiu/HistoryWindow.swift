@@ -236,10 +236,10 @@ struct HistoryView: View {
             // Badge count
             Text("\(vm.filteredItems.count)")
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundColor(AstryxTheme.cyan)
+                .foregroundColor(AstryxTheme.accent)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2)
-                .background(Capsule().fill(AstryxTheme.cyan.opacity(0.15)))
+                .background(Capsule().fill(AstryxTheme.accent.opacity(0.15)))
 
             Spacer()
 
@@ -327,11 +327,11 @@ struct HistoryView: View {
                             .padding(.vertical, 5)
                             .background(
                                 Capsule()
-                                    .fill(vm.selectedFilter == filter ? AstryxTheme.cyan.opacity(0.20) : AstryxTheme.card)
+                                    .fill(vm.selectedFilter == filter ? AstryxTheme.accent.opacity(0.20) : AstryxTheme.card)
                                     .overlay(
                                         Capsule()
                                             .stroke(
-                                                vm.selectedFilter == filter ? AstryxTheme.cyan.opacity(0.55) : AstryxTheme.borderSubtle,
+                                                vm.selectedFilter == filter ? AstryxTheme.accent.opacity(0.55) : AstryxTheme.borderSubtle,
                                                 lineWidth: AstryxTheme.borderWidth
                                             )
                                     )
