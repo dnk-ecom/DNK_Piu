@@ -32,7 +32,7 @@ extension Color {
 final class DictationPillPanel: NSPanel {
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 220, height: 44),
+            contentRect: NSRect(x: 0, y: 0, width: 260, height: 44),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -53,7 +53,7 @@ final class DictationPillPanel: NSPanel {
         let mouseLocation = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
         let visible = screen.visibleFrame
-        let size = CGSize(width: 220, height: 44)
+        let size = CGSize(width: 260, height: 44)
         let x = visible.midX - (size.width / 2.0)
         let y = visible.minY + 24.0
         self.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: true)
@@ -92,7 +92,7 @@ struct DictationPillContainerView: View {
     }
 }
 
-/// Ultra-minimalist, Apple-grade floating dark glass capsule matching Wispr Flow & Superwhisper.
+/// Ultra-minimalist, Apple-grade floating dark glass capsule matching Wispr Flow & Astryx OS.
 struct WisprFlowPillView: View {
     @ObservedObject private var dictation = AudioDictation.shared
 
@@ -100,20 +100,29 @@ struct WisprFlowPillView: View {
         ZStack {
             // Obsidian Black Frosted Glass Capsule
             Capsule()
-                .fill(Color(hex: "#0C0E14").opacity(0.94))
+                .fill(Color(hex: "#090A0F").opacity(0.95))
 
-            // Thin Luxury Border
+            // Thin Luxury Border (Astryx Gradient)
             Capsule()
                 .strokeBorder(
-                    isLocked
-                        ? LinearGradient(colors: [Color(hex: "#F97316"), Color(hex: "#FB923C")], startPoint: .leading, endPoint: .trailing)
-                        : (isThinking
-                            ? LinearGradient(colors: [Color(hex: "#6366F1"), Color(hex: "#22D3EE")], startPoint: .leading, endPoint: .trailing)
-                            : LinearGradient(colors: [Color.white.opacity(0.18), Color.white.opacity(0.08)], startPoint: .leading, endPoint: .trailing)),
+                    borderGradient,
                     lineWidth: isLocked ? 1.4 : 0.8
                 )
 
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
+                // Leading Swallow Bird Badge (Ластівка - Astryx Identity)
+                Image(systemName: "swift")
+                    .font(.system(size: 11.0, weight: .bold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color(hex: "#06B6D4"), Color(hex: "#10B981")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .scaleEffect(x: -1, y: 1)
+                    .opacity(0.95)
+
                 switch dictation.phase {
                 case .listening(let locked):
                     if locked {
@@ -122,18 +131,18 @@ struct WisprFlowPillView: View {
                             dictation.cancel()
                         } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 9.0, weight: .bold))
+                                .font(.system(size: 8.5, weight: .bold))
                                 .foregroundColor(.white.opacity(0.7))
-                                .frame(width: 18, height: 18)
-                                .background(Circle().fill(Color.white.opacity(0.10)))
+                                .frame(width: 17, height: 17)
+                                .background(Circle().fill(Color.white.opacity(0.12)))
                         }
                         .buttonStyle(.plain)
                     } else {
                         // Pulsating Minimal Recording Dot
                         Circle()
-                            .fill(Color(hex: "#FF3B30"))
+                            .fill(Color(hex: "#EF4444"))
                             .frame(width: 6, height: 6)
-                            .shadow(color: Color(hex: "#FF3B30").opacity(0.7), radius: 3)
+                            .shadow(color: Color(hex: "#EF4444").opacity(0.8), radius: 3)
                     }
 
                     // 7 Dynamic Audio Waveform Bars
@@ -145,32 +154,38 @@ struct WisprFlowPillView: View {
                             dictation.stopAndTranscribe()
                         } label: {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 9.0, weight: .heavy))
+                                .font(.system(size: 8.5, weight: .heavy))
                                 .foregroundColor(.black)
-                                .frame(width: 18, height: 18)
+                                .frame(width: 17, height: 17)
                                 .background(Circle().fill(Color(hex: "#10B981")))
                         }
                         .buttonStyle(.plain)
                     } else {
                         Text("⌥")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.40))
+                            .foregroundColor(.white.opacity(0.35))
                     }
 
                 case .thinking:
                     // Elegant Wave Shimmer during Gemini 3.5 Flash Lite transcription
                     SevenWaveBarsView(levels: dictation.audioLevels, isThinking: true)
 
-                    Text("⚡ ...")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundColor(Color(hex: "#22D3EE"))
+                    Text("✦ Astryx...")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(hex: "#22D3EE"), Color(hex: "#818CF8")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
 
                 case .done(_, let wasPasted):
                     Image(systemName: wasPasted ? "checkmark" : "doc.on.clipboard")
                         .font(.system(size: 10.5, weight: .bold))
                         .foregroundColor(Color(hex: wasPasted ? "#10B981" : "#F59E0B"))
 
-                    Text(wasPasted ? "Вставлено" : "Скопійовано (⌘V)")
+                    Text(wasPasted ? "Вставлено" : "Скопійовано")
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
 
@@ -187,10 +202,10 @@ struct WisprFlowPillView: View {
                     EmptyView()
                 }
             }
-            .padding(.horizontal, isLocked ? 8 : 12)
+            .padding(.horizontal, isLocked ? 8 : 10)
         }
         .frame(width: pillWidth, height: 32)
-        .shadow(color: Color.black.opacity(0.38), radius: 10, y: 3)
+        .shadow(color: Color.black.opacity(0.45), radius: 12, y: 4)
     }
 
     private var isLocked: Bool {
@@ -198,17 +213,31 @@ struct WisprFlowPillView: View {
         return false
     }
 
-    private var isThinking: Bool {
-        if case .thinking = dictation.phase { return true }
-        return false
+    private var borderGradient: AnyShapeStyle {
+        switch dictation.phase {
+        case .listening(let locked):
+            if locked {
+                return AnyShapeStyle(LinearGradient(colors: [Color(hex: "#F97316"), Color(hex: "#FB923C")], startPoint: .leading, endPoint: .trailing))
+            } else {
+                return AnyShapeStyle(LinearGradient(colors: [Color(hex: "#06B6D4").opacity(0.4), Color.white.opacity(0.12)], startPoint: .leading, endPoint: .trailing))
+            }
+        case .thinking:
+            return AnyShapeStyle(LinearGradient(colors: [Color(hex: "#06B6D4"), Color(hex: "#8B5CF6")], startPoint: .leading, endPoint: .trailing))
+        case .done(_, let wasPasted):
+            return AnyShapeStyle(LinearGradient(colors: [Color(hex: wasPasted ? "#10B981" : "#F59E0B"), Color.white.opacity(0.2)], startPoint: .leading, endPoint: .trailing))
+        case .failed:
+            return AnyShapeStyle(LinearGradient(colors: [Color(hex: "#EF4444"), Color.white.opacity(0.1)], startPoint: .leading, endPoint: .trailing))
+        case .idle:
+            return AnyShapeStyle(LinearGradient(colors: [Color.white.opacity(0.18), Color.white.opacity(0.08)], startPoint: .leading, endPoint: .trailing))
+        }
     }
 
     private var pillWidth: CGFloat {
         switch dictation.phase {
-        case .listening(let locked): return locked ? 154 : 124
-        case .thinking: return 120
-        case .done(_, let wasPasted): return wasPasted ? 116 : 158
-        case .failed: return 130
+        case .listening(let locked): return locked ? 168 : 142
+        case .thinking: return 152
+        case .done(_, let wasPasted): return wasPasted ? 142 : 160
+        case .failed: return 146
         case .idle: return 60
         }
     }
@@ -226,7 +255,6 @@ struct SevenWaveBarsView: View {
                 ForEach(0..<7, id: \.self) { i in
                     let height: CGFloat = {
                         if isThinking {
-                            // Gentle sine-wave breathing wave during processing
                             let waveVal: Double = sin(t * 6.5 - Double(i) * 0.65)
                             let wave: Double = max(0.08, waveVal)
                             return CGFloat(3.5 + 11.0 * wave)
@@ -239,7 +267,7 @@ struct SevenWaveBarsView: View {
                     Capsule()
                         .fill(
                             isThinking
-                                ? Color(hex: "#818CF8").opacity(0.95)
+                                ? Color(hex: "#06B6D4").opacity(0.95)
                                 : Color.white.opacity(0.92)
                         )
                         .frame(width: 2.8, height: height)

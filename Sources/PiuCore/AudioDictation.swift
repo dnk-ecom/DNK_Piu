@@ -203,11 +203,29 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             }
 
             let base64Audio = audioData.base64EncodedString()
+            let intelligentPrompt = """
+            System instruction: You are a high-speed intelligent speech-to-text editor for the Astryx / DNK OS developer workstation (uk-UA / en-US).
+            Task: Transcribe spoken audio into CLEAN, FINAL, PRODUCTION-READY text.
+
+            CRITICAL EDITING & SELF-CORRECTION RULES:
+            1. Self-Correction & Retractions: If the speaker misspeaks, self-corrects, or says 'ой ні', 'видали це', 'закресли', 'ні, зачекай', 'тобто' or changes a word/sentence, apply the edit inline and output ONLY the final intended thought. Example: 'Створи таску для шапки... ой ні, для футера' -> 'Створи таску для футера'.
+            2. Filler Words: Strip speech disfluencies and fillers (е-е, ну, типу, коротше, власне, так би мовити) unless essential to meaning.
+            3. Formatting & Punctuation Commands:
+               - 'новий рядок' / 'з нового рядка' -> \\n
+               - 'новий абзац' -> \\n\\n
+               - 'знак оклику' -> !
+               - 'знак питання' -> ?
+               - 'двокрапка' -> :
+               - 'крапка з комою' -> ;
+               - 'тире' -> —
+            4. Developer Terminology: Preserve technical names in original casing and spelling (Shopify, Astryx, Clyro, Antigravity, commit, branch, PR, Swift, Python, React, Next.js, API, GraphQL, Tailwind, Docker).
+            5. Output Format: Return STRICTLY the final recognized and cleaned text without quotation marks, conversational replies, or code blocks. If no speech is present, return empty string.
+            """
             let payload: [String: Any] = [
                 "audio_base64": base64Audio,
                 "mime_type": "audio/wav",
                 "model": "gemini-3.5-flash-lite",
-                "prompt": "Транскрибуй мову розробника (uk-UA / en-US). Зберігай технічні терміни та назви в оригіналі (Shopify, Clyro, Antigravity, commit, branch, PR, Swift, Python, Coucou, Huddle). Автоматично розставляй розділові знаки. Повертай ВИКЛЮЧНО розпізнаний текст без лапок чи коментарів."
+                "prompt": intelligentPrompt
             ]
 
             var request = URLRequest(url: self.bridgeURL)
@@ -235,7 +253,8 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
                     return
                 }
 
-                let transcript = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                let rawTranscript = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                let transcript = Self.sanitizeTranscript(rawTranscript)
 
                 await MainActor.run {
                     self.isProcessing = false
@@ -262,6 +281,9 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
                     } else {
                         FlowPaste.copyToClipboard(transcript)
                     }
+
+                    // Asynchronously dispatch and synchronize with Astryx Action Bus
+                    AstryxVoiceBridge.dispatch(transcript: transcript, targetApp: destApp?.bundleIdentifier)
 
                     self.phase = .done(transcript, wasPasted: pasted)
                     NSSound(named: "Pop")?.play()
@@ -313,6 +335,39 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
         meterTimer?.invalidate()
         meterTimer = nil
         audioLevels = [Float](repeating: 0.1, count: 9)
+    }
+
+    /// Post-processing sanitizer that strips markdown wrappers and converts voice formatting commands.
+    public static func sanitizeTranscript(_ raw: String) -> String {
+        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Strip markdown code block wrappers if model wrapped in ```text ... ```
+        if text.hasPrefix("```") {
+            let lines = text.components(separatedBy: "\n")
+            if lines.count >= 2 && lines.first?.hasPrefix("```") == true {
+                let inner = lines.dropFirst().dropLast(lines.last?.hasPrefix("```") == true ? 1 : 0)
+                text = inner.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        // Strip outer quotes
+        if (text.hasPrefix("\"") && text.hasSuffix("\"")) || (text.hasPrefix("«") && text.hasSuffix("»")) {
+            text = String(text.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        // Deterministic regex replacement for spoken formatting commands
+        let replacements: [(String, String)] = [
+            ("(?i)\\b(новий рядок|нова стрічка)\\b", "\n"),
+            ("(?i)\\b(новий абзац)\\b", "\n\n")
+        ]
+        for (pattern, repl) in replacements {
+            if let regex = try? NSRegularExpression(pattern: pattern) {
+                let range = NSRange(location: 0, length: text.utf16.count)
+                text = regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: repl)
+            }
+        }
+
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
@@ -504,3 +559,62 @@ public enum FlowPaste {
         return found ?? fallback
     }
 }
+
+/// Bridge synchronizing transcribed dictations with the Astryx Operating System & AI Agents.
+public enum AstryxVoiceBridge {
+    public static func dispatch(transcript: String, targetApp: String?) {
+        guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+        let payload: [String: Any] = [
+            "text": transcript,
+            "target_app": targetApp ?? "unknown",
+            "timestamp": Date().timeIntervalSince1970,
+            "source": "dnk_piu_pill"
+        ]
+
+        let queue = DispatchQueue(label: "com.dnk.piu.astryx", qos: .utility)
+        queue.async {
+            let fileManager = FileManager.default
+            let dirPath = ("~/.dnk_runtime/piu" as NSString).expandingTildeInPath
+            if !fileManager.fileExists(atPath: dirPath) {
+                try? fileManager.createDirectory(atPath: dirPath, withIntermediateDirectories: true)
+            }
+
+            // 1. Write latest intent to ~/.dnk_runtime/piu/last_intent.json
+            let lastIntentPath = "\(dirPath)/last_intent.json"
+            if let jsonData = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]) {
+                try? jsonData.write(to: URL(fileURLWithPath: lastIntentPath))
+            }
+
+            // 2. Append to ~/.dnk_runtime/piu/voice_events.jsonl
+            let eventsPath = "\(dirPath)/voice_events.jsonl"
+            if let lineData = try? JSONSerialization.data(withJSONObject: payload, options: []) {
+                var lineWithNewline = lineData
+                lineWithNewline.append(contentsOf: "\n".data(using: .utf8)!)
+                if let handle = FileHandle(forWritingAtPath: eventsPath) {
+                    handle.seekToEndOfFile()
+                    handle.write(lineWithNewline)
+                    handle.closeFile()
+                } else {
+                    try? lineWithNewline.write(to: URL(fileURLWithPath: eventsPath))
+                }
+            }
+
+            // 3. Non-blocking HTTP POST to Astryx / DNK kernel endpoints (fire & forget)
+            let endpoints = [
+                "http://127.0.0.1:8000/api/v1/voice/parse_command",
+                "http://127.0.0.1:3000/api/voice/intent"
+            ]
+            for endpoint in endpoints {
+                guard let url = URL(string: endpoint) else { continue }
+                var req = URLRequest(url: url)
+                req.httpMethod = "POST"
+                req.timeoutInterval = 0.5
+                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+                URLSession.shared.dataTask(with: req) { _, _, _ in }.resume()
+            }
+        }
+    }
+}
+
