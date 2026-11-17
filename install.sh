@@ -46,9 +46,14 @@ echo "🔐 Signing with persistent DNK Piu Local Signing certificate..."
 codesign --force --deep -s "DNK Piu Local Signing" "$APP"
 
 echo "🔗 Setting up runtime hooks in $BIN..."
-mkdir -p "$BIN" "$HOME/.dnk_runtime/piu/pending" "$HOME/.dnk_runtime/piu/responses" "$HOME/.dnk_runtime/piu/sessions"
+mkdir -p "$BIN" "$HOME/.dnk_runtime/bin" "$HOME/.dnk_runtime/piu/pending" "$HOME/.dnk_runtime/piu/responses" "$HOME/.dnk_runtime/piu/sessions"
 cp "$ROOT/hooks/piu_hook.py" "$BIN/piu_hook.py"
 chmod +x "$BIN/piu_hook.py"
+if [[ -f "$ROOT/hooks/piu_history.py" ]]; then
+  cp "$ROOT/hooks/piu_history.py" "$BIN/piu_history.py"
+  chmod +x "$BIN/piu_history.py"
+  ln -sf "$BIN/piu_history.py" "$HOME/.dnk_runtime/bin/piu-history"
+fi
 
 echo "✅ DNK_Piu v1.0.0 successfully installed to $APP"
 echo "👉 Launch with: open -a '$APP'"

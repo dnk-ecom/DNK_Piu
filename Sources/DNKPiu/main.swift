@@ -81,11 +81,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
 
         // Recent Dictated Transcripts (Click to copy / insert)
-        if !dictation.history.isEmpty {
-            let sectionHeader = NSMenuItem(title: "Останні надиктовки:", action: nil, keyEquivalent: "")
-            sectionHeader.isEnabled = false
-            menu.addItem(sectionHeader)
+        let sectionHeader = NSMenuItem(title: "Журнал надиктовок:", action: nil, keyEquivalent: "")
+        sectionHeader.isEnabled = false
+        menu.addItem(sectionHeader)
 
+        if !dictation.history.isEmpty {
             for item in dictation.history.prefix(5) {
                 let preview = item.text.count > 36 ? "\(item.text.prefix(36))..." : item.text
                 let menuItem = NSMenuItem(title: "  📋 \(preview)", action: #selector(pasteHistoryItem(_:)), keyEquivalent: "")
@@ -93,12 +93,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 menuItem.target = self
                 menu.addItem(menuItem)
             }
+        } else {
+            let emptyItem = NSMenuItem(title: "  (Історія сесії порожня)", action: nil, keyEquivalent: "")
+            emptyItem.isEnabled = false
+            menu.addItem(emptyItem)
+        }
 
-            let clearHistoryItem = NSMenuItem(title: "  🗑 Очистити історію", action: #selector(clearHistory), keyEquivalent: "")
+        let openLogItem = NSMenuItem(title: "  📂 Відкрити журнал подій (JSONL)", action: #selector(openEventsLog), keyEquivalent: "")
+        openLogItem.target = self
+        menu.addItem(openLogItem)
+
+        if !dictation.history.isEmpty {
+            let clearHistoryItem = NSMenuItem(title: "  🗑 Очистити історію сесії", action: #selector(clearHistory), keyEquivalent: "")
             clearHistoryItem.target = self
             menu.addItem(clearHistoryItem)
-            menu.addItem(.separator())
         }
+        menu.addItem(.separator())
 
         // HotKey Selection Submenu
         let hotKeyMenu = NSMenu()
@@ -140,6 +150,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func clearHistory() {
         dictation.clearHistory()
+    }
+
+    @objc private func openEventsLog() {
+        let path = ("~/.dnk_runtime/piu/voice_events.jsonl" as NSString).expandingTildeInPath
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 
     @objc private func selectHotKeyPreset(_ sender: NSMenuItem) {
