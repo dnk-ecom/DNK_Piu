@@ -80,8 +80,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(dictateItem)
         menu.addItem(.separator())
 
-        // Recent Dictated Transcripts (Click to copy / insert)
-        let sectionHeader = NSMenuItem(title: "Журнал надиктовок:", action: nil, keyEquivalent: "")
+        // Dedicated Native History Window Action (⌘H)
+        let historyWindowItem = NSMenuItem(title: "📖 Відкрити журнал надиктовок...", action: #selector(openHistoryWindow), keyEquivalent: "h")
+        historyWindowItem.target = self
+        menu.addItem(historyWindowItem)
+        menu.addItem(.separator())
+
+        // Quick Recent Dictated Transcripts (Click to copy / insert)
+        let sectionHeader = NSMenuItem(title: "Останні надиктовки (клік для вставки):", action: nil, keyEquivalent: "")
         sectionHeader.isEnabled = false
         menu.addItem(sectionHeader)
 
@@ -98,10 +104,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             emptyItem.isEnabled = false
             menu.addItem(emptyItem)
         }
-
-        let openLogItem = NSMenuItem(title: "  📂 Відкрити журнал подій (JSONL)", action: #selector(openEventsLog), keyEquivalent: "")
-        openLogItem.target = self
-        menu.addItem(openLogItem)
 
         if !dictation.history.isEmpty {
             let clearHistoryItem = NSMenuItem(title: "  🗑 Очистити історію сесії", action: #selector(clearHistory), keyEquivalent: "")
@@ -152,9 +154,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dictation.clearHistory()
     }
 
-    @objc private func openEventsLog() {
-        let path = ("~/.dnk_runtime/piu/voice_events.jsonl" as NSString).expandingTildeInPath
-        NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    @objc private func openHistoryWindow() {
+        HistoryWindowController.shared.showHistory()
     }
 
     @objc private func selectHotKeyPreset(_ sender: NSMenuItem) {

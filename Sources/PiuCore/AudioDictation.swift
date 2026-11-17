@@ -22,17 +22,51 @@ public struct DictationItem: Identifiable, Codable, Equatable {
     public let id: UUID
     public let text: String
     public let timestamp: Date
+    public let targetApp: String?
 
-    public init(id: UUID = UUID(), text: String, timestamp: Date = Date()) {
+    public init(id: UUID = UUID(), text: String, timestamp: Date = Date(), targetApp: String? = nil) {
         self.id = id
         self.text = text
         self.timestamp = timestamp
+        self.targetApp = targetApp
     }
 
     public var formattedTime: String {
         let formatter = DateFormatter()
-        formatter.timeStyle = .short
+        formatter.timeStyle = .medium
         return formatter.string(from: timestamp)
+    }
+
+    public var relativeTime: String {
+        let elapsed = Date().timeIntervalSince(timestamp)
+        if elapsed < 60 {
+            return "щойно"
+        } else if elapsed < 3600 {
+            let mins = max(1, Int(elapsed / 60))
+            return "\(mins) хв тому"
+        } else if elapsed < 86400 {
+            let hours = Int(elapsed / 3600)
+            return "\(hours) год тому"
+        } else {
+            let days = Int(elapsed / 86400)
+            return "\(days) дн тому"
+        }
+    }
+
+    public var appDisplayName: String {
+        guard let target = targetApp, !target.isEmpty else { return "Система" }
+        let last = target.components(separatedBy: ".").last ?? target
+        switch last.lowercased() {
+        case "antigravity-ide": return "Antigravity IDE"
+        case "ghostty": return "Ghostty"
+        case "cursor": return "Cursor"
+        case "code": return "VS Code"
+        case "chrome": return "Google Chrome"
+        case "safari": return "Safari"
+        case "slack": return "Slack"
+        case "telegram": return "Telegram"
+        default: return last.capitalized
+        }
     }
 }
 
@@ -161,6 +195,7 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
         history.removeAll()
         lastTranscript = ""
         saveHistory()
+        Self.clearPersistentEvents()
     }
 
     /// Removes a specific transcript item.
@@ -170,6 +205,59 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             lastTranscript = history.first?.text ?? ""
         }
         saveHistory()
+        Self.deletePersistentEvent(item)
+    }
+
+    /// Loads all recorded events from the persistent ~/.dnk_runtime/piu/voice_events.jsonl store.
+    public static func loadPersistentEvents() -> [DictationItem] {
+        let path = ("~/.dnk_runtime/piu/voice_events.jsonl" as NSString).expandingTildeInPath
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let content = String(data: data, encoding: .utf8) else {
+            return []
+        }
+        var items: [DictationItem] = []
+        let lines = content.components(separatedBy: "\n")
+        for line in lines where !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            guard let lineData = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  let text = json["text"] as? String else { continue }
+            let tsDouble = json["timestamp"] as? Double ?? Date().timeIntervalSince1970
+            let date = Date(timeIntervalSince1970: tsDouble)
+            let app = json["target_app"] as? String
+            items.append(DictationItem(text: text, timestamp: date, targetApp: app))
+        }
+        return items.reversed()
+    }
+
+    /// Rewrites the persistent store without a specific deleted item.
+    public static func deletePersistentEvent(_ item: DictationItem) {
+        let path = ("~/.dnk_runtime/piu/voice_events.jsonl" as NSString).expandingTildeInPath
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let content = String(data: data, encoding: .utf8) else { return }
+        let lines = content.components(separatedBy: "\n")
+        var remaining: [String] = []
+        var deletedOne = false
+        for line in lines where !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            guard let lineData = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  let text = json["text"] as? String else {
+                remaining.append(line)
+                continue
+            }
+            if !deletedOne && text == item.text {
+                deletedOne = true
+                continue
+            }
+            remaining.append(line)
+        }
+        let updated = remaining.joined(separator: "\n") + (remaining.isEmpty ? "" : "\n")
+        try? updated.write(to: URL(fileURLWithPath: path), atomically: true, encoding: .utf8)
+    }
+
+    /// Clears the persistent store file completely.
+    public static func clearPersistentEvents() {
+        let path = ("~/.dnk_runtime/piu/voice_events.jsonl" as NSString).expandingTildeInPath
+        try? "".write(to: URL(fileURLWithPath: path), atomically: true, encoding: .utf8)
     }
 
     /// Stops recording and sends the audio to Vertex AI Gemini 3.8 Flash for transcription.
@@ -268,7 +356,7 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
                     }
 
                     self.lastTranscript = transcript
-                    let newItem = DictationItem(text: transcript)
+                    let newItem = DictationItem(text: transcript, targetApp: destApp?.bundleIdentifier)
                     self.history.insert(newItem, at: 0)
                     if self.history.count > 30 {
                         self.history.removeLast()
