@@ -6,11 +6,12 @@ import SwiftUI
 /// Astryx Design Style context menu header view displaying real-time status and branding.
 struct AstryxMenuHeaderView: View {
     @ObservedObject private var dictation = AudioDictation.shared
+    @ObservedObject private var theme = ThemeManager.shared
     let activePreset: FlowKeyPreset
 
     var body: some View {
         HStack(spacing: 10) {
-            // Swallow Icon Badge (Astryx Identity)
+            // Swallow Icon Badge (Shopify / Astryx Identity)
             Image(systemName: "swift")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(AstryxTheme.swallowGradient)
@@ -28,12 +29,12 @@ struct AstryxMenuHeaderView: View {
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
 
-                    Text("VOICE")
+                    Text(ThemeManager.shared.mode == .shopify ? "SHOPIFY" : "VOICE")
                         .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                        .foregroundColor(AstryxTheme.cyan)
+                        .foregroundColor(AstryxTheme.accent)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
-                        .background(Capsule().fill(AstryxTheme.cyan.opacity(0.18)))
+                        .background(Capsule().fill(AstryxTheme.accent.opacity(0.18)))
                 }
 
                 Text(statusSubtitle)
@@ -231,7 +232,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotKeyParent.submenu = hotKeyMenu
         menu.addItem(hotKeyParent)
 
-        // 6. Accessibility Permission Status
+        // 6. Theme Selection Submenu (Shopify Open Design / Astryx Obsidian)
+        let themeMenu = NSMenu()
+        for mode in AppThemeMode.allCases {
+            let item = NSMenuItem(title: mode.displayName, action: #selector(selectThemeMode(_:)), keyEquivalent: "")
+            item.representedObject = mode
+            item.target = self
+            if mode == ThemeManager.shared.mode {
+                item.state = .on
+            }
+            themeMenu.addItem(item)
+        }
+        let themeParent = NSMenuItem(title: "Тема оформлення (Shopify / Astryx)", action: nil, keyEquivalent: "")
+        if let icon = NSImage(systemSymbolName: "paintbrush.fill", accessibilityDescription: nil) {
+            themeParent.image = icon
+        }
+        themeParent.submenu = themeMenu
+        menu.addItem(themeParent)
+
+        // 7. Accessibility Permission Status
         let isTrusted = DictationHotKey.isAccessibilityGranted()
         let axTitle = isTrusted ? "Дозволи Accessibility: Надано ✓" : "Дозволи Accessibility: Потрібно надати..."
         let accessibilityItem = NSMenuItem(title: axTitle, action: #selector(openAccessibility), keyEquivalent: "")
@@ -271,6 +290,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func selectHotKeyPreset(_ sender: NSMenuItem) {
         if let preset = sender.representedObject as? FlowKeyPreset {
             hotKey.setPreset(preset)
+        }
+    }
+
+    @objc private func selectThemeMode(_ sender: NSMenuItem) {
+        if let mode = sender.representedObject as? AppThemeMode {
+            ThemeManager.shared.setMode(mode)
         }
     }
 

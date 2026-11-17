@@ -26,6 +26,14 @@ final class HistoryWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: panel)
         panel.delegate = self
 
+        NotificationCenter.default.addObserver(
+            forName: .themeDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak panel] _ in
+            panel?.backgroundColor = AstryxTheme.nsCanvas
+        }
+
         let hosting = NSHostingView(
             rootView: HistoryView(
                 onClose: { [weak self] in
@@ -143,6 +151,7 @@ struct HistoryView: View {
     var onPasteItem: (DictationItem) -> Void
 
     @StateObject private var vm = HistoryViewModel()
+    @ObservedObject private var theme = ThemeManager.shared
 
     var body: some View {
         ZStack {
@@ -385,6 +394,7 @@ struct HistoryCardView: View {
     var onPaste: () -> Void
     var onCopy: () -> Void
     var onDelete: () -> Void
+    @ObservedObject private var theme = ThemeManager.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -393,7 +403,7 @@ struct HistoryCardView: View {
                 // Clock icon & exact time
                 Image(systemName: "clock")
                     .font(.system(size: 10.5))
-                    .foregroundColor(AstryxTheme.cyan)
+                    .foregroundColor(AstryxTheme.accent)
 
                 Text(item.formattedTime)
                     .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
@@ -453,7 +463,7 @@ struct HistoryCardView: View {
                         Text("Вставити")
                             .font(.system(size: 10.5, weight: .bold))
                     }
-                    .foregroundColor(AstryxTheme.canvas)
+                    .foregroundColor(AstryxTheme.accentText)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(

@@ -1,58 +1,192 @@
 import AppKit
+import Combine
 import SwiftUI
 
-/// Canonical Astryx OS Design System Tokens for native macOS interfaces.
+/// Available UI Theme presets for DNK_Piu matching DNK OS & Shopify Research.
+public enum AppThemeMode: String, CaseIterable, Identifiable {
+    case shopify = "shopify"
+    case obsidian = "obsidian"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .shopify: return "Shopify Open Design (Electric Mint & Forest Teal)"
+        case .obsidian: return "Astryx Obsidian (Cold Slate & Cyan)"
+        }
+    }
+}
+
+/// Central Theme Manager managing the active palette across DNK_Piu.
+public final class ThemeManager: ObservableObject {
+    public static let shared = ThemeManager()
+
+    @Published public var mode: AppThemeMode {
+        didSet {
+            UserDefaults.standard.set(mode.rawValue, forKey: "dnk_piu_theme_mode")
+            NotificationCenter.default.post(name: .themeDidChange, object: mode)
+        }
+    }
+
+    private init() {
+        let saved = UserDefaults.standard.string(forKey: "dnk_piu_theme_mode") ?? AppThemeMode.shopify.rawValue
+        self.mode = AppThemeMode(rawValue: saved) ?? .shopify
+    }
+
+    public func setMode(_ newMode: AppThemeMode) {
+        self.mode = newMode
+    }
+}
+
+extension Notification.Name {
+    public static let themeDidChange = Notification.Name("dnk_piu_themeDidChange")
+}
+
+/// Canonical Design System Tokens for native macOS interfaces.
 public enum AstryxTheme {
+    // Current Active Mode
+    public static var mode: AppThemeMode {
+        ThemeManager.shared.mode
+    }
+
     // MARK: - Surfaces
-    public static let canvas = Color(hex: "#090A0C")
-    public static let panel = Color(hex: "#111317")
-    public static let card = Color(hex: "#16181D")
-    public static let elevated = Color(hex: "#1E2128")
-    public static let overlay = Color(hex: "#090A0C").opacity(0.85)
+    public static var canvas: Color {
+        mode == .shopify ? Color(hex: "#02090A") : Color(hex: "#090A0C")
+    }
+
+    public static var panel: Color {
+        mode == .shopify ? Color(hex: "#061A1C") : Color(hex: "#111317")
+    }
+
+    public static var card: Color {
+        mode == .shopify ? Color(hex: "#0C2322") : Color(hex: "#16181D")
+    }
+
+    public static var elevated: Color {
+        mode == .shopify ? Color(hex: "#102620") : Color(hex: "#1E2128")
+    }
+
+    public static var overlay: Color {
+        mode == .shopify ? Color(hex: "#02090A").opacity(0.85) : Color(hex: "#090A0C").opacity(0.85)
+    }
 
     // MARK: - Borders
-    public static let borderSubtle = Color.white.opacity(0.08)
-    public static let borderDefault = Color.white.opacity(0.14)
-    public static let borderStrong = Color.white.opacity(0.24)
+    public static var borderSubtle: Color {
+        mode == .shopify ? Color(hex: "#1E2C31").opacity(0.85) : Color.white.opacity(0.08)
+    }
+
+    public static var borderDefault: Color {
+        mode == .shopify ? Color(hex: "#2A3E45") : Color.white.opacity(0.14)
+    }
+
+    public static var borderStrong: Color {
+        mode == .shopify ? Color(hex: "#36F4A4").opacity(0.40) : Color.white.opacity(0.24)
+    }
+
     public static let borderWidth: CGFloat = 0.8
 
-    // MARK: - Accents
+    // MARK: - Signature Shopify & Astryx Accents
+    public static var accent: Color {
+        mode == .shopify ? Color(hex: "#36F4A4") : Color(hex: "#06B6D4") // Electric Mint vs Cyan
+    }
+
+    public static var secondaryAccent: Color {
+        mode == .shopify ? Color(hex: "#008060") : Color(hex: "#10B981") // Polaris Emerald vs Emerald
+    }
+
+    public static var accentText: Color {
+        mode == .shopify ? Color(hex: "#000000") : Color(hex: "#08090D")
+    }
+
     public static let cyan = Color(hex: "#06B6D4")
     public static let purple = Color(hex: "#A855F7")
     public static let emerald = Color(hex: "#10B981")
+    public static let shopifyMint = Color(hex: "#36F4A4")
+    public static let shopifyForest = Color(hex: "#008060")
     public static let amber = Color(hex: "#F59E0B")
     public static let red = Color(hex: "#EF4444")
 
     // MARK: - Gradients
-    public static let activeGradient = LinearGradient(
-        colors: [Color(hex: "#06B6D4"), Color(hex: "#10B981")],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
+    public static var activeGradient: LinearGradient {
+        if mode == .shopify {
+            return LinearGradient(
+                colors: [Color(hex: "#36F4A4"), Color(hex: "#008060")],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        } else {
+            return LinearGradient(
+                colors: [Color(hex: "#06B6D4"), Color(hex: "#10B981")],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
+    }
 
-    public static let thinkingGradient = LinearGradient(
-        colors: [Color(hex: "#06B6D4"), Color(hex: "#A855F7")],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
+    public static var thinkingGradient: LinearGradient {
+        if mode == .shopify {
+            return LinearGradient(
+                colors: [Color(hex: "#36F4A4"), Color(hex: "#008060")],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        } else {
+            return LinearGradient(
+                colors: [Color(hex: "#06B6D4"), Color(hex: "#A855F7")],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
+    }
 
-    public static let thinkingVerticalGradient = LinearGradient(
-        colors: [Color(hex: "#06B6D4"), Color(hex: "#A855F7")],
-        startPoint: .top,
-        endPoint: .bottom
-    )
+    public static var thinkingVerticalGradient: LinearGradient {
+        if mode == .shopify {
+            return LinearGradient(
+                colors: [Color(hex: "#36F4A4"), Color(hex: "#008060")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else {
+            return LinearGradient(
+                colors: [Color(hex: "#06B6D4"), Color(hex: "#A855F7")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
 
-    public static let swallowGradient = LinearGradient(
-        colors: [Color(hex: "#06B6D4"), Color(hex: "#10B981")],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    public static var swallowGradient: LinearGradient {
+        if mode == .shopify {
+            return LinearGradient(
+                colors: [Color(hex: "#36F4A4"), Color(hex: "#008060")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else {
+            return LinearGradient(
+                colors: [Color(hex: "#06B6D4"), Color(hex: "#10B981")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
 
     // MARK: - AppKit Colors
-    public static let nsCanvas = NSColor(hex: "#090A0C")
-    public static let nsPanel = NSColor(hex: "#111317")
-    public static let nsCard = NSColor(hex: "#16181D")
-    public static let nsElevated = NSColor(hex: "#1E2128")
+    public static var nsCanvas: NSColor {
+        mode == .shopify ? NSColor(hex: "#02090A") : NSColor(hex: "#090A0C")
+    }
+
+    public static var nsPanel: NSColor {
+        mode == .shopify ? NSColor(hex: "#061A1C") : NSColor(hex: "#111317")
+    }
+
+    public static var nsCard: NSColor {
+        mode == .shopify ? NSColor(hex: "#0C2322") : NSColor(hex: "#16181D")
+    }
+
+    public static var nsElevated: NSColor {
+        mode == .shopify ? NSColor(hex: "#102620") : NSColor(hex: "#1E2128")
+    }
 }
 
 extension Color {

@@ -69,6 +69,7 @@ struct DictationPillContainerView: View {
 /// Ultra-minimalist, Apple-grade floating dark glass capsule matching Astryx OS tokens.
 struct WisprFlowPillView: View {
     @ObservedObject private var dictation = AudioDictation.shared
+    @ObservedObject private var theme = ThemeManager.shared
 
     var body: some View {
         ZStack {
@@ -223,6 +224,7 @@ struct WisprFlowPillView: View {
 struct SevenWaveBarsView: View {
     let levels: [Float]
     let isThinking: Bool
+    @ObservedObject private var theme = ThemeManager.shared
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
