@@ -3,74 +3,25 @@ import Combine
 import PiuCore
 import SwiftUI
 
-/// Floating, nonactivating panel that accepts input without stealing focus from active editor/terminal.
-final class PiuPanel: NSPanel {
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
-}
-
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
-    private let store = PiuStore()
-    private var panel: PiuPanel!
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var dictationPanel: DictationPillPanel!
     private var statusItem: NSStatusItem?
     private var cancellables: Set<AnyCancellable> = []
     private let hotKey = DictationHotKey.shared
-    private let margin: CGFloat = 16
-    private let topMargin: CGFloat = 8
+    private let dictation = AudioDictation.shared
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        store.start()
-
-        // 1. Configure main companion panel (Top-Right, hidden by default)
-        panel = PiuPanel(
-            contentRect: NSRect(origin: .zero, size: CGSize(width: Layout.panelWidth, height: Layout.maxPanelHeight)),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.level = .floating
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.hidesOnDeactivate = false
-        panel.isMovableByWindowBackground = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentView = NSHostingView(rootView: RootView(store: store))
-        panel.delegate = self
-
-        // Keep completely hidden on launch so it does not obstruct the workspace
-        panel.orderOut(nil)
-
-        // 2. Configure dedicated pop-up dictation pill (Bottom Center, Coucou-style)
+        // 1. Configure dedicated floating dictation capsule pill (Wispr Flow / Superwhisper style)
         dictationPanel = DictationPillPanel()
 
-        // 3. Start Global HotKey Monitor (Right Option hold-to-talk / double-tap hands-free)
+        // 2. Start Global HotKey Monitor (Hold Option to speak / double-tap for hands-free)
         hotKey.start()
 
-        // 4. Setup Menubar status item with direct click toggle and right-click context menu
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusItem?.button {
-            button.title = ""
-            if let image = NSImage(systemSymbolName: "cpu", accessibilityDescription: "DNK_Piu") {
-                image.isTemplate = true
-                button.image = image
-            }
-            button.target = self
-            button.action = #selector(statusBarButtonClicked(_:))
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        }
+        // 3. Setup Menubar status item with direct click toggle and right-click context menu
+        setupStatusBar()
 
-        // 5. React to companion panel expansion with safe bounds animation
-        store.$expanded
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] expanded in
-                self?.fit(expanded: expanded)
-            }
-            .store(in: &cancellables)
-
-        // 6. React to Dictation Phase to show/hide the pop-up pill
-        store.dictation.$phase
+        // 4. React to Dictation Phase to show/hide the pop-up capsule pill
+        dictation.$phase
             .receive(on: DispatchQueue.main)
             .sink { [weak self] phase in
                 guard let self = self else { return }
@@ -85,17 +36,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             .store(in: &cancellables)
     }
 
+    private func setupStatusBar() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        guard let button = statusItem?.button else { return }
+
+        if let image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "DNK_Piu Voice Dictation") {
+            image.isTemplate = true
+            button.image = image
+        }
+        button.target = self
+        button.action = #selector(statusBarButtonClicked(_:))
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    }
+
     @objc private func statusBarButtonClicked(_ sender: NSStatusBarButton) {
-        let event = NSApp.currentEvent
-        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
-            let menu = buildMenu()
-            statusItem?.menu = menu
-            sender.performClick(nil)
-            DispatchQueue.main.async { [weak self] in
-                self?.statusItem?.menu = nil
-            }
-        } else {
-            toggleVisible()
+        let menu = buildMenu()
+        statusItem?.menu = menu
+        sender.performClick(nil)
+        DispatchQueue.main.async { [weak self] in
+            self?.statusItem?.menu = nil
         }
     }
 
@@ -113,36 +72,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private func populateMenu(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        // Primary Toggle Action
-        let toggleTitle = store.expanded ? "Сховати панель DNK_Piu" : "Відкрити панель DNK_Piu"
-        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleVisible), keyEquivalent: "p")
-        toggleItem.target = self
-        menu.addItem(toggleItem)
+        // Primary Voice Dictation Action
+        let dictateTitle = dictation.isRecording ? "Зупинити диктування (Розпізнати)" : "Диктувати голосом (\(hotKey.activePreset.symbol))"
+        let dictateItem = NSMenuItem(title: dictateTitle, action: #selector(toggleDictate), keyEquivalent: "d")
+        dictateItem.target = self
+        menu.addItem(dictateItem)
         menu.addItem(.separator())
 
-        // TOP SECTION IN MENU: Recent dictated texts
-        if !store.dictation.history.isEmpty {
-            let header = NSMenuItem(title: "🎙️ Надиктовано (останні):", action: nil, keyEquivalent: "")
-            header.isEnabled = false
-            menu.addItem(header)
+        // Recent Dictated Transcripts (Click to copy / insert)
+        if !dictation.history.isEmpty {
+            let sectionHeader = NSMenuItem(title: "Останні надиктовки:", action: nil, keyEquivalent: "")
+            sectionHeader.isEnabled = false
+            menu.addItem(sectionHeader)
 
-            for item in store.dictation.history.prefix(3) {
-                let preview = item.text.count > 34 ? "\(item.text.prefix(34))..." : item.text
-                let menuItem = NSMenuItem(title: "  📋 \"\(preview)\"", action: #selector(copyHistoryItem(_:)), keyEquivalent: "")
+            for item in dictation.history.prefix(5) {
+                let preview = item.text.count > 36 ? "\(item.text.prefix(36))..." : item.text
+                let menuItem = NSMenuItem(title: "  📋 \(preview)", action: #selector(pasteHistoryItem(_:)), keyEquivalent: "")
                 menuItem.representedObject = item.text
                 menuItem.target = self
                 menu.addItem(menuItem)
             }
+
+            let clearHistoryItem = NSMenuItem(title: "  🗑 Очистити історію", action: #selector(clearHistory), keyEquivalent: "")
+            clearHistoryItem.target = self
+            menu.addItem(clearHistoryItem)
             menu.addItem(.separator())
         }
-
-        let dictateItem = NSMenuItem(
-            title: "Диктувати голосом (\(hotKey.activePreset.symbol))",
-            action: #selector(toggleDictate),
-            keyEquivalent: "d"
-        )
-        dictateItem.target = self
-        menu.addItem(dictateItem)
 
         // HotKey Selection Submenu
         let hotKeyMenu = NSMenu()
@@ -159,18 +114,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         hotKeyParent.submenu = hotKeyMenu
         menu.addItem(hotKeyParent)
 
-        let resetItem = NSMenuItem(title: "Скинути позицію у правий кут", action: #selector(resetCorner), keyEquivalent: "")
-        resetItem.target = self
-        menu.addItem(resetItem)
-
-        menu.addItem(.separator())
-        let accessibilityItem = NSMenuItem(title: "Дозволи Accessibility...", action: #selector(openAccessibility), keyEquivalent: "")
+        // Accessibility Permission Status
+        let isTrusted = DictationHotKey.isAccessibilityGranted()
+        let axTitle = isTrusted ? "Дозволи Accessibility: Надано ✓" : "Дозволи Accessibility: Потрібно надати..."
+        let accessibilityItem = NSMenuItem(title: axTitle, action: #selector(openAccessibility), keyEquivalent: "")
         accessibilityItem.target = self
         menu.addItem(accessibilityItem)
 
+        menu.addItem(.separator())
         let quitItem = NSMenuItem(title: "Вийти з DNK_Piu", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
+    }
+
+    @objc private func toggleDictate() {
+        dictation.toggle()
+    }
+
+    @objc private func pasteHistoryItem(_ sender: NSMenuItem) {
+        if let text = sender.representedObject as? String {
+            FlowPaste.insert(text)
+        }
+    }
+
+    @objc private func clearHistory() {
+        dictation.clearHistory()
     }
 
     @objc private func selectHotKeyPreset(_ sender: NSMenuItem) {
@@ -179,70 +147,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
 
-    @objc private func copyHistoryItem(_ sender: NSMenuItem) {
-        if let text = sender.representedObject as? String {
-            FlowPaste.insert(text)
-        }
-    }
-
     @objc private func openAccessibility() {
         DictationHotKey.openAccessibilitySettings()
-    }
-
-    private func positionPanel() {
-        guard let screen = panel?.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
-        let visible = screen.visibleFrame
-        let targetWidth: CGFloat = Layout.panelWidth
-        let targetHeight: CGFloat = min(Layout.maxPanelHeight, visible.height - 40)
-
-        let desiredX = visible.maxX - targetWidth - margin
-        let desiredY = visible.maxY - targetHeight - topMargin
-
-        let clampedX = min(max(desiredX, visible.minX + margin), visible.maxX - targetWidth - margin)
-        let clampedY = min(max(desiredY, visible.minY + margin), visible.maxY - targetHeight - topMargin)
-
-        panel.setFrame(NSRect(x: clampedX, y: clampedY, width: targetWidth, height: targetHeight), display: true, animate: false)
-    }
-
-    private func fit(expanded: Bool) {
-        if !expanded {
-            panel.orderOut(nil)
-            return
-        }
-
-        guard let screen = panel?.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
-        let visible = screen.visibleFrame
-        let targetWidth: CGFloat = Layout.panelWidth
-        let targetHeight: CGFloat = min(Layout.maxPanelHeight, visible.height - 40)
-
-        // Explicitly anchor to top-right of visible frame with strict clamping inside screen borders
-        let desiredX = visible.maxX - targetWidth - margin
-        let desiredY = visible.maxY - targetHeight - topMargin
-
-        let clampedX = min(max(desiredX, visible.minX + margin), visible.maxX - targetWidth - margin)
-        let clampedY = min(max(desiredY, visible.minY + margin), visible.maxY - targetHeight - topMargin)
-
-        panel.setFrame(NSRect(x: clampedX, y: clampedY, width: targetWidth, height: targetHeight), display: true, animate: true)
-        panel.orderFrontRegardless()
-    }
-
-    @objc private func toggleVisible() {
-        store.expanded.toggle()
-        fit(expanded: store.expanded)
-    }
-
-    @objc private func toggleDictate() {
-        store.dictation.toggle()
-    }
-
-    @objc private func resetCorner() {
-        positionPanel()
     }
 
     @objc private func quit() {
         hotKey.stop()
         dictationPanel?.orderOut(nil)
-        store.stop()
         NSApp.terminate(nil)
     }
 }
@@ -251,5 +162,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
-app.setActivationPolicy(.accessory) // Runs cleanly as a status bar accessory without dock clutter
+app.setActivationPolicy(.accessory)
 app.run()

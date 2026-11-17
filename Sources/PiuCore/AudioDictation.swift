@@ -357,7 +357,7 @@ public enum FlowPaste {
         }
     }
 
-    /// Sets the text on the general pasteboard, restores focus to target app if needed, and synthesizes ⌘V.
+    /// Sets the text on the general pasteboard and synthesizes ⌘V into the frontmost caret.
     @discardableResult
     public static func insert(_ text: String, into targetApp: NSRunningApplication? = nil) -> Bool {
         guard !text.isEmpty else { return false }
@@ -379,68 +379,61 @@ public enum FlowPaste {
         // 3. Wake accessibility for Chromium/Electron editors (Antigravity, Cursor, VS Code)
         wakeAccessibility(of: targetApp)
 
-        // 4. Check if target application needs explicit reactivation
-        let needsActivation = (targetApp != nil && targetApp?.bundleIdentifier != Bundle.main.bundleIdentifier && !(targetApp?.isActive ?? true))
-
-        if needsActivation, let app = targetApp {
+        // 4. Ensure target application is active if specified and inactive
+        if let app = targetApp, !app.isActive, app.bundleIdentifier != Bundle.main.bundleIdentifier {
+            log("FlowPaste.insert: targetApp \(app.bundleIdentifier ?? "") is inactive, yielding activation...")
             if #available(macOS 14.0, *) {
                 NSApp.yieldActivation(to: app)
             }
-            app.activate()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                postCmdV(into: app, isTrusted: isTrusted)
+            app.activate(options: [.activateIgnoringOtherApps])
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                postCmdV(isTrusted: isTrusted)
                 scheduleClipboardRestore(saved, count: board.changeCount)
             }
-        } else {
-            // Immediate hardware paste into active editor where caret is located
-            postCmdV(into: targetApp, isTrusted: isTrusted)
-            scheduleClipboardRestore(saved, count: board.changeCount)
+            return isTrusted
         }
+
+        // 5. Immediate hardware paste into active editor where caret is located
+        postCmdV(isTrusted: isTrusted)
+        scheduleClipboardRestore(saved, count: board.changeCount)
 
         return isTrusted
     }
 
-    /// True 4-step hardware keyboard event sequence: Command Down -> V Down -> 20ms -> V Up -> Command Up.
-    private static func postCmdV(into targetApp: NSRunningApplication? = nil, isTrusted: Bool = true) {
-        log("postCmdV: executing 4-step sequence into \(targetApp?.bundleIdentifier ?? "activeWindow")... isTrusted=\(isTrusted)")
-        let source = CGEventSource(stateID: .combinedSessionState)
-        let cmdKey: CGKeyCode = 0x37 // Left Command
-        let vKey = vKeyCode()
+    /// Coucou-verified synchronous ⌘V key injection via CoreGraphics HID Tap.
+    private static func postCmdV(isTrusted: Bool = true) {
+        log("postCmdV: executing Coucou-style synchronous CGEventPost... isTrusted=\(isTrusted)")
 
-        guard let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: cmdKey, keyDown: true),
-              let vDown = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: true),
-              let vUp = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: false),
-              let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: cmdKey, keyDown: false) else {
-            log("postCmdV: Failed to create CGEvent instances")
-            return
-        }
+        if isTrusted {
+            let source = CGEventSource(stateID: .combinedSessionState)
+            let vKey = vKeyCode()
 
-        cmdDown.flags = .maskCommand
-        vDown.flags = .maskCommand
-        vUp.flags = .maskCommand
-        cmdUp.flags = []
+            guard let vDown = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: true),
+                  let vUp = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: false) else {
+                log("postCmdV: Failed to create CGEvent instances")
+                return
+            }
 
-        // Post Command Down and V Down to system HID tap
-        cmdDown.post(tap: .cghidEventTap)
-        vDown.post(tap: .cghidEventTap)
+            // Command modifier flag is attached directly to the V key events
+            vDown.flags = .maskCommand
+            vUp.flags = .maskCommand
 
-        // Realistic 20ms dwell time before releasing keys so window manager processes key combo
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+            // Post synchronously to system HID tap
+            vDown.post(tap: .cghidEventTap)
             vUp.post(tap: .cghidEventTap)
-            cmdUp.post(tap: .cghidEventTap)
-        }
-
-        // AppleScript fallback if Accessibility is not granted
-        if !isTrusted {
+            log("postCmdV: successfully posted vDown + vUp to .cghidEventTap")
+        } else {
+            // AppleScript fallback if Accessibility permission is missing
             log("postCmdV: Accessibility permission missing, executing System Events AppleScript fallback...")
             let scriptSource = "tell application \"System Events\" to keystroke \"v\" using command down"
             var err: NSDictionary?
             NSAppleScript(source: scriptSource)?.executeAndReturnError(&err)
             if let err = err {
                 log("postCmdV: AppleScript error: \(err)")
+            } else {
+                log("postCmdV: AppleScript paste completed successfully.")
             }
         }
-        log("postCmdV: finished dispatching paste events.")
     }
 
     private static func scheduleClipboardRestore(_ items: [[NSPasteboard.PasteboardType: Data]], count: Int) {

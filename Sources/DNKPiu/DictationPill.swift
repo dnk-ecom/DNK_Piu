@@ -2,6 +2,32 @@ import AppKit
 import PiuCore
 import SwiftUI
 
+extension Color {
+    init(hex: String) {
+        let clean = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: clean).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch clean.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255.0,
+            green: Double(g) / 255.0,
+            blue: Double(b) / 255.0,
+            opacity: Double(a) / 255.0
+        )
+    }
+}
+
 /// Floating pop-up pill panel placed at bottom center of the active screen (Wispr Flow / Superwhisper style).
 final class DictationPillPanel: NSPanel {
     init() {
@@ -201,8 +227,9 @@ struct SevenWaveBarsView: View {
                     let height: CGFloat = {
                         if isThinking {
                             // Gentle sine-wave breathing wave during processing
-                            let wave = max(0.08, sin(t * 6.5 - Double(i) * 0.65))
-                            return 3.5 + 11.0 * CGFloat(wave)
+                            let waveVal: Double = sin(t * 6.5 - Double(i) * 0.65)
+                            let wave: Double = max(0.08, waveVal)
+                            return CGFloat(3.5 + 11.0 * wave)
                         } else {
                             let level = levels.indices.contains(i) ? CGFloat(levels[i]) : 0.1
                             return max(3.5, min(16.0, 3.5 + 12.5 * level))
