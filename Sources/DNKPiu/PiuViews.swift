@@ -122,7 +122,10 @@ public struct AccessibilityBanner: View {
 
             Spacer()
 
-            Button(action: { DictationHotKey.openAccessibilitySettings() }) {
+            Button(action: {
+                DictationHotKey.requestAccessibilityPermission()
+                DictationHotKey.openAccessibilitySettings()
+            }) {
                 Text("Надати")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(.white)

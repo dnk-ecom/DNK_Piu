@@ -6,7 +6,7 @@ import SwiftUI
 final class DictationPillPanel: NSPanel {
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 340, height: 90),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 160),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -27,9 +27,9 @@ final class DictationPillPanel: NSPanel {
         let mouseLocation = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
         let visible = screen.visibleFrame
-        let size = CGSize(width: 340, height: 90)
+        let size = CGSize(width: 520, height: 160)
         let x = visible.midX - (size.width / 2.0)
-        let y = visible.minY + 24.0
+        let y = visible.minY + 12.0
         self.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: true)
     }
 
@@ -38,7 +38,7 @@ final class DictationPillPanel: NSPanel {
         self.alphaValue = 0.0
         self.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.20
+            ctx.duration = 0.18
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             self.animator().alphaValue = 1.0
         }
@@ -46,7 +46,7 @@ final class DictationPillPanel: NSPanel {
 
     func hideAnimated() {
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.24
+            ctx.duration = 0.22
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             self.animator().alphaValue = 0.0
         }, completionHandler: {
@@ -55,48 +55,21 @@ final class DictationPillPanel: NSPanel {
     }
 }
 
-/// Container that hosts both the floating speech bubble and the bottom capsule pill.
+/// Container that hosts both the floating speech bubble card and the bottom capsule pill.
 struct DictationPillContainerView: View {
     @ObservedObject private var dictation = AudioDictation.shared
 
     var body: some View {
-        VStack(spacing: 6) {
-            // Speech Bubble / Announcement above the pill
+        VStack(spacing: 8) {
+            Spacer(minLength: 0)
+
+            // 1. Coucou Quote Card / Announcement above the pill
             if case .done(let text, let wasPasted) = dictation.phase, !text.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: wasPasted ? "checkmark.circle.fill" : "doc.on.clipboard.fill")
-                        .foregroundColor(Color(hex: wasPasted ? "#10B981" : "#F59E0B"))
-                        .font(.system(size: 11, weight: .bold))
-
-                    Text(text.count > 34 ? "\(text.prefix(34))..." : text)
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundColor(Color.white.opacity(0.95))
-                        .lineLimit(1)
-
-                    Text(wasPasted ? "Вставлено" : "Скопійовано")
-                        .font(.system(size: 9.5, weight: .bold))
-                        .foregroundColor(Color(hex: wasPasted ? "#10B981" : "#F59E0B"))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color(hex: wasPasted ? "#10B981" : "#F59E0B").opacity(0.18))
-                        .clipShape(Capsule())
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color(hex: "#0A0B0E").opacity(0.96))
-                        .shadow(color: Color.black.opacity(0.4), radius: 8, y: 3)
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-                )
-                .transition(.scale(scale: 0.85).combined(with: .opacity))
+                FlowQuoteCardView(text: text, wasPasted: wasPasted)
             } else if case .failed(let err) = dictation.phase {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundColor(Color(hex: "#F59E0B"))
+                        .foregroundColor(Color(hex: "#EF4444"))
                         .font(.system(size: 11, weight: .bold))
                     Text(err)
                         .font(.system(size: 11, weight: .medium))
@@ -105,14 +78,110 @@ struct DictationPillContainerView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(Capsule().fill(Color(hex: "#0A0B0E").opacity(0.96)))
-                .overlay(Capsule().strokeBorder(Color(hex: "#F59E0B").opacity(0.4), lineWidth: 1))
+                .overlay(Capsule().strokeBorder(Color(hex: "#EF4444").opacity(0.4), lineWidth: 1))
             }
 
-            // Bottom Jet-Black Capsule Pill (Coucou FlowPill)
+            // 2. Bottom Jet-Black Capsule Pill (Coucou FlowPill)
             CoucouFlowPillView()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: dictation.phase)
+        .animation(.spring(response: 0.34, dampingFraction: 0.78), value: dictation.phase)
+    }
+}
+
+/// Rich quote card displayed right above the pill with action buttons (Wispr Flow / Coucou style).
+struct FlowQuoteCardView: View {
+    let text: String
+    let wasPasted: Bool
+    @ObservedObject var dictation = AudioDictation.shared
+    @LocalState private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: wasPasted ? "checkmark.circle.fill" : "doc.on.clipboard.fill")
+                    .foregroundColor(Color(hex: wasPasted ? "#10B981" : "#F59E0B"))
+                    .font(.system(size: 12, weight: .bold))
+
+                Text(wasPasted ? "Текст успішно вставлено" : "Скопійовано в буфер обміну")
+                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                    .foregroundColor(Color(hex: "#F5F6F8"))
+
+                Spacer()
+
+                Button {
+                    dictation.dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(Color.white.opacity(0.6))
+                        .frame(width: 20, height: 20)
+                        .background(Circle().fill(Color.white.opacity(0.10)))
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Transcribed text preview (multi-line up to 3 lines)
+            Text("\"\(text)\"")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.92))
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                Spacer()
+
+                // Copy Button
+                Button {
+                    FlowPaste.copyToClipboard(text)
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 9.5, weight: .bold))
+                        Text(copied ? "Скопійовано!" : "Скопіювати")
+                            .font(.system(size: 10.5, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.12))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+
+                // Paste Again Button (forces immediate ⌘V into the target app)
+                Button {
+                    FlowPaste.insert(text, into: dictation.targetApp)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.right.doc.on.clipboard")
+                            .font(.system(size: 9.5, weight: .bold))
+                        Text("Вставити (⌘V)")
+                            .font(.system(size: 10.5, weight: .bold))
+                    }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color(hex: "#22D3EE"))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: 380)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(hex: "#0A0B0E").opacity(0.96))
+                .shadow(color: Color.black.opacity(0.5), radius: 14, y: 6)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+        )
+        .transition(.scale(scale: 0.85, anchor: .bottom).combined(with: .opacity))
     }
 }
 
@@ -126,23 +195,22 @@ struct CoucouFlowPillView: View {
             Capsule()
                 .fill(Color(hex: "#0A0B0E").opacity(0.96))
 
-            // Thin Frosted Border
+            // Thin Frosted Border (Glowing Amber in Hands-Free mode, Gradient in Thinking)
             Capsule()
                 .strokeBorder(
-                    LinearGradient(
-                        colors: isThinking
-                            ? [Color(hex: "#C084FC"), Color(hex: "#22D3EE")]
-                            : [Color.white.opacity(0.20), Color.white.opacity(0.12)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    lineWidth: 1.0
+                    isLocked
+                        ? LinearGradient(colors: [Color(hex: "#F97316"), Color(hex: "#FB923C")], startPoint: .leading, endPoint: .trailing)
+                        : (isThinking
+                            ? LinearGradient(colors: [Color(hex: "#C084FC"), Color(hex: "#22D3EE")], startPoint: .leading, endPoint: .trailing)
+                            : LinearGradient(colors: [Color.white.opacity(0.22), Color.white.opacity(0.12)], startPoint: .leading, endPoint: .trailing)),
+                    lineWidth: isLocked ? 1.5 : 1.0
                 )
 
             HStack(spacing: 8) {
                 switch dictation.phase {
-                case .listening(let isLocked):
-                    if isLocked {
+                case .listening(let locked):
+                    if locked {
+                        // ✕ Cancel button in Hands-Free
                         Button {
                             dictation.cancel()
                         } label: {
@@ -153,18 +221,25 @@ struct CoucouFlowPillView: View {
                                 .background(Circle().fill(Color.white.opacity(0.12)))
                         }
                         .buttonStyle(.plain)
+                        .help("Скасувати запис")
                     } else {
-                        // Glowing Gemini AI Star
-                        Image(systemName: "sparkle")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(Color(hex: "#22D3EE"))
-                            .shadow(color: Color(hex: "#22D3EE").opacity(0.7), radius: 3)
+                        // Glowing Gemini Star Mascot
+                        HStack(spacing: 3) {
+                            Circle()
+                                .fill(Color(hex: "#22D3EE"))
+                                .frame(width: 5, height: 5)
+                                .shadow(color: Color(hex: "#22D3EE").opacity(0.8), radius: 3)
+                            Image(systemName: "sparkle")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(Color(hex: "#22D3EE"))
+                        }
                     }
 
                     // 9 Coucou Dancing Dots
                     CoucouNineDotsView(levels: dictation.audioLevels, isThinking: false)
 
-                    if isLocked {
+                    if locked {
+                        // ✓ Finish button in Hands-Free
                         Button {
                             dictation.stopAndTranscribe()
                         } label: {
@@ -175,6 +250,7 @@ struct CoucouFlowPillView: View {
                                 .background(Circle().fill(Color(hex: "#10B981")))
                         }
                         .buttonStyle(.plain)
+                        .help("Завершити надиктовку")
                     }
 
                 case .thinking:
@@ -194,23 +270,29 @@ struct CoucouFlowPillView: View {
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
 
-                case .failed:
-                    Image(systemName: "mic.slash.fill")
+                case .failed(let err):
+                    Image(systemName: "exclamationmark.circle.fill")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Color(hex: "#F59E0B"))
+                        .foregroundColor(Color(hex: "#EF4444"))
 
-                    Text("Помилка")
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
+                    Text(err.count > 16 ? "\(err.prefix(16))..." : err)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.85))
 
                 case .idle:
                     EmptyView()
                 }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, isLocked ? 8 : 14)
         }
         .frame(width: pillWidth, height: 34)
         .shadow(color: Color.black.opacity(0.45), radius: 12, y: 4)
+        .animation(.spring(response: 0.35, dampingFraction: 0.76), value: dictation.phase)
+    }
+
+    private var isLocked: Bool {
+        if case .listening(let locked) = dictation.phase { return locked }
+        return false
     }
 
     private var isThinking: Bool {
@@ -220,10 +302,10 @@ struct CoucouFlowPillView: View {
 
     private var pillWidth: CGFloat {
         switch dictation.phase {
-        case .listening(let isLocked): return isLocked ? 168 : 138
-        case .thinking: return 128
-        case .done: return 110
-        case .failed: return 110
+        case .listening(let locked): return locked ? 168 : 138
+        case .thinking: return 132
+        case .done: return 114
+        case .failed: return 128
         case .idle: return 80
         }
     }
