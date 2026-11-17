@@ -18,7 +18,7 @@ final class HistoryWindowController: NSWindowController, NSWindowDelegate {
         panel.titlebarAppearsTransparent = true
         panel.titleVisibility = .hidden
         panel.isMovableByWindowBackground = true
-        panel.backgroundColor = NSColor(red: 0.05, green: 0.06, blue: 0.09, alpha: 0.98)
+        panel.backgroundColor = AstryxTheme.nsCanvas
         panel.level = .floating
         panel.center()
         panel.setFrameAutosaveName("DNKPiuHistoryWindowHUD")
@@ -77,7 +77,7 @@ enum HistoryTimeFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// View model driving the history state with standard Combine publishers (no macro dependency).
+/// View model driving the history state with standard Combine publishers.
 final class HistoryViewModel: ObservableObject {
     @Published var items: [DictationItem] = []
     @Published var searchText: String = ""
@@ -146,8 +146,8 @@ struct HistoryView: View {
 
     var body: some View {
         ZStack {
-            // Deep Obsidian Black Background
-            Color(hex: "#08090D")
+            // Astryx Canvas Background (#090A0C)
+            AstryxTheme.canvas
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -156,14 +156,15 @@ struct HistoryView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
                     .padding(.bottom, 12)
+                    .background(AstryxTheme.panel.opacity(0.85))
 
                 // Search & Filter Toolbar
                 filterBar
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+                    .padding(.vertical, 12)
 
                 Divider()
-                    .background(Color.white.opacity(0.08))
+                    .background(AstryxTheme.borderSubtle)
 
                 // Scrollable Content
                 if vm.filteredItems.isEmpty {
@@ -186,12 +187,13 @@ struct HistoryView: View {
                 }
 
                 Divider()
-                    .background(Color.white.opacity(0.08))
+                    .background(AstryxTheme.borderSubtle)
 
                 // Bottom Status Footer
                 footerBar
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
+                    .background(AstryxTheme.panel.opacity(0.85))
             }
         }
         .frame(minWidth: 580, minHeight: 480)
@@ -215,13 +217,7 @@ struct HistoryView: View {
             // Swallow Icon Badge (Astryx Identity)
             Image(systemName: "swift")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color(hex: "#06B6D4"), Color(hex: "#10B981")],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .foregroundStyle(AstryxTheme.swallowGradient)
                 .scaleEffect(x: -1, y: 1)
 
             Text("Журнал надиктовок")
@@ -231,10 +227,10 @@ struct HistoryView: View {
             // Badge count
             Text("\(vm.filteredItems.count)")
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundColor(Color(hex: "#06B6D4"))
+                .foregroundColor(AstryxTheme.cyan)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2)
-                .background(Capsule().fill(Color(hex: "#06B6D4").opacity(0.15)))
+                .background(Capsule().fill(AstryxTheme.cyan.opacity(0.15)))
 
             Spacer()
 
@@ -244,9 +240,13 @@ struct HistoryView: View {
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(Color.white.opacity(0.06)))
+                    .foregroundColor(.white.opacity(0.7))
+                    .frame(width: 26, height: 26)
+                    .background(
+                        Circle()
+                            .fill(AstryxTheme.elevated)
+                            .overlay(Circle().stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth))
+                    )
             }
             .buttonStyle(.plain)
             .help("Оновити записи")
@@ -257,9 +257,13 @@ struct HistoryView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.white.opacity(0.6))
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(Color.white.opacity(0.08)))
+                    .foregroundColor(.white.opacity(0.7))
+                    .frame(width: 26, height: 26)
+                    .background(
+                        Circle()
+                            .fill(AstryxTheme.elevated)
+                            .overlay(Circle().stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth))
+                    )
             }
             .buttonStyle(.plain)
             .help("Закрити (Esc)")
@@ -268,11 +272,11 @@ struct HistoryView: View {
 
     private var filterBar: some View {
         VStack(spacing: 10) {
-            // Search Input
+            // Search Input with Astryx Elevated Surface and 0.8px Border
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(.white.opacity(0.45))
 
                 TextField("Пошук по тексту надиктовок або програмі...", text: $vm.searchText)
                     .textFieldStyle(.plain)
@@ -285,7 +289,7 @@ struct HistoryView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(.white.opacity(0.45))
                     }
                     .buttonStyle(.plain)
                 }
@@ -294,10 +298,10 @@ struct HistoryView: View {
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white.opacity(0.05))
+                    .fill(AstryxTheme.elevated)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.10), lineWidth: 0.8)
+                            .stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth)
                     )
             )
 
@@ -309,15 +313,18 @@ struct HistoryView: View {
                     } label: {
                         Text(filter.rawValue)
                             .font(.system(size: 11.5, weight: vm.selectedFilter == filter ? .semibold : .regular))
-                            .foregroundColor(vm.selectedFilter == filter ? .white : .white.opacity(0.55))
+                            .foregroundColor(vm.selectedFilter == filter ? .white : .white.opacity(0.60))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 5)
                             .background(
                                 Capsule()
-                                    .fill(vm.selectedFilter == filter ? Color(hex: "#06B6D4").opacity(0.25) : Color.white.opacity(0.04))
+                                    .fill(vm.selectedFilter == filter ? AstryxTheme.cyan.opacity(0.20) : AstryxTheme.card)
                                     .overlay(
                                         Capsule()
-                                            .stroke(vm.selectedFilter == filter ? Color(hex: "#06B6D4").opacity(0.5) : Color.clear, lineWidth: 0.8)
+                                            .stroke(
+                                                vm.selectedFilter == filter ? AstryxTheme.cyan.opacity(0.55) : AstryxTheme.borderSubtle,
+                                                lineWidth: AstryxTheme.borderWidth
+                                            )
                                     )
                             )
                     }
@@ -363,7 +370,7 @@ struct HistoryView: View {
                 } label: {
                     Text("Очистити все")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color(hex: "#EF4444").opacity(0.85))
+                        .foregroundColor(AstryxTheme.red.opacity(0.85))
                 }
                 .buttonStyle(.plain)
             }
@@ -386,7 +393,7 @@ struct HistoryCardView: View {
                 // Clock icon & exact time
                 Image(systemName: "clock")
                     .font(.system(size: 10.5))
-                    .foregroundColor(Color(hex: "#06B6D4"))
+                    .foregroundColor(AstryxTheme.cyan)
 
                 Text(item.formattedTime)
                     .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
@@ -403,11 +410,11 @@ struct HistoryCardView: View {
                     Text(item.appDisplayName)
                         .font(.system(size: 10, weight: .medium))
                 }
-                .foregroundColor(Color(hex: "#A78BFA"))
+                .foregroundColor(AstryxTheme.purple)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2.5)
                 .background(
-                    Capsule().fill(Color(hex: "#8B5CF6").opacity(0.12))
+                    Capsule().fill(AstryxTheme.purple.opacity(0.14))
                 )
 
                 Spacer()
@@ -422,12 +429,16 @@ struct HistoryCardView: View {
                         Text(isCopied ? "Скопійовано" : "Копіювати")
                             .font(.system(size: 10.5, weight: .medium))
                     }
-                    .foregroundColor(isCopied ? Color(hex: "#10B981") : .white.opacity(0.7))
+                    .foregroundColor(isCopied ? AstryxTheme.emerald : .white.opacity(0.75))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.white.opacity(0.06))
+                            .fill(AstryxTheme.elevated)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth)
+                            )
                     )
                 }
                 .buttonStyle(.plain)
@@ -442,18 +453,12 @@ struct HistoryCardView: View {
                         Text("Вставити")
                             .font(.system(size: 10.5, weight: .bold))
                     }
-                    .foregroundColor(Color(hex: "#08090D"))
+                    .foregroundColor(AstryxTheme.canvas)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color(hex: "#06B6D4"), Color(hex: "#10B981")],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
+                            .fill(AstryxTheme.activeGradient)
                     )
                 }
                 .buttonStyle(.plain)
@@ -481,10 +486,10 @@ struct HistoryCardView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(hex: "#10121A").opacity(0.90))
+                .fill(AstryxTheme.card.opacity(0.95))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.white.opacity(0.07), lineWidth: 0.8)
+                        .stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth)
                 )
         )
     }

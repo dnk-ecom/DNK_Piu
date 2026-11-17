@@ -2,32 +2,6 @@ import AppKit
 import PiuCore
 import SwiftUI
 
-extension Color {
-    init(hex: String) {
-        let clean = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: clean).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch clean.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (255, 0, 0, 0)
-        }
-        self.init(
-            .sRGB,
-            red: Double(r) / 255.0,
-            green: Double(g) / 255.0,
-            blue: Double(b) / 255.0,
-            opacity: Double(a) / 255.0
-        )
-    }
-}
-
 /// Floating pop-up pill panel placed at bottom center of the active screen (Wispr Flow / Superwhisper style).
 final class DictationPillPanel: NSPanel {
     init() {
@@ -92,34 +66,28 @@ struct DictationPillContainerView: View {
     }
 }
 
-/// Ultra-minimalist, Apple-grade floating dark glass capsule matching Wispr Flow & Astryx OS.
+/// Ultra-minimalist, Apple-grade floating dark glass capsule matching Astryx OS tokens.
 struct WisprFlowPillView: View {
     @ObservedObject private var dictation = AudioDictation.shared
 
     var body: some View {
         ZStack {
-            // Obsidian Black Frosted Glass Capsule
+            // Astryx Canvas Surface with Frosted Glass Opacity
             Capsule()
-                .fill(Color(hex: "#090A0F").opacity(0.95))
+                .fill(AstryxTheme.canvas.opacity(0.96))
 
-            // Thin Luxury Border (Astryx Gradient)
+            // Thin Luxury 0.8px Border (Passive 0.08 / Active Astryx Gradients)
             Capsule()
                 .strokeBorder(
                     borderGradient,
-                    lineWidth: isLocked ? 1.4 : 0.8
+                    lineWidth: isLocked ? 1.2 : AstryxTheme.borderWidth
                 )
 
             HStack(spacing: 7) {
                 // Leading Swallow Bird Badge (Ластівка - Astryx Identity)
                 Image(systemName: "swift")
                     .font(.system(size: 11.0, weight: .bold))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color(hex: "#06B6D4"), Color(hex: "#10B981")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .foregroundStyle(AstryxTheme.swallowGradient)
                     .scaleEffect(x: -1, y: 1)
                     .opacity(0.95)
 
@@ -140,9 +108,9 @@ struct WisprFlowPillView: View {
                     } else {
                         // Pulsating Minimal Recording Dot
                         Circle()
-                            .fill(Color(hex: "#EF4444"))
+                            .fill(AstryxTheme.red)
                             .frame(width: 6, height: 6)
-                            .shadow(color: Color(hex: "#EF4444").opacity(0.8), radius: 3)
+                            .shadow(color: AstryxTheme.red.opacity(0.8), radius: 3)
                     }
 
                     // 7 Dynamic Audio Waveform Bars
@@ -155,9 +123,9 @@ struct WisprFlowPillView: View {
                         } label: {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 8.5, weight: .heavy))
-                                .foregroundColor(.black)
+                                .foregroundColor(AstryxTheme.canvas)
                                 .frame(width: 17, height: 17)
-                                .background(Circle().fill(Color(hex: "#10B981")))
+                                .background(Circle().fill(AstryxTheme.emerald))
                         }
                         .buttonStyle(.plain)
                     } else {
@@ -167,23 +135,19 @@ struct WisprFlowPillView: View {
                     }
 
                 case .thinking:
-                    // Elegant Wave Shimmer during Gemini 3.5 Flash Lite transcription
-                    SevenWaveBarsView(levels: dictation.audioLevels, isThinking: true)
+                    // Minimalist Flash Indicator (⚡)
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundStyle(AstryxTheme.thinkingGradient)
+                        .opacity(0.95)
 
-                    Text("✦ Astryx...")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(hex: "#22D3EE"), Color(hex: "#818CF8")],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                    // 7 Dynamic Breathing Wave Bars with Gradient Illumination (Cyan/Purple)
+                    SevenWaveBarsView(levels: dictation.audioLevels, isThinking: true)
 
                 case .done(_, let wasPasted):
                     Image(systemName: wasPasted ? "checkmark" : "doc.on.clipboard")
                         .font(.system(size: 10.5, weight: .bold))
-                        .foregroundColor(Color(hex: wasPasted ? "#10B981" : "#F59E0B"))
+                        .foregroundColor(wasPasted ? AstryxTheme.emerald : AstryxTheme.amber)
 
                     Text(wasPasted ? "Вставлено" : "Скопійовано")
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
@@ -192,7 +156,7 @@ struct WisprFlowPillView: View {
                 case .failed(let err):
                     Image(systemName: "exclamationmark.circle.fill")
                         .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundColor(Color(hex: "#EF4444"))
+                        .foregroundColor(AstryxTheme.red)
 
                     Text(err.count > 16 ? "\(err.prefix(16))..." : err)
                         .font(.system(size: 10.5, weight: .medium))
@@ -205,7 +169,7 @@ struct WisprFlowPillView: View {
             .padding(.horizontal, isLocked ? 8 : 10)
         }
         .frame(width: pillWidth, height: 32)
-        .shadow(color: Color.black.opacity(0.45), radius: 12, y: 4)
+        .shadow(color: Color.black.opacity(0.50), radius: 12, y: 4)
     }
 
     private var isLocked: Bool {
@@ -217,25 +181,37 @@ struct WisprFlowPillView: View {
         switch dictation.phase {
         case .listening(let locked):
             if locked {
-                return AnyShapeStyle(LinearGradient(colors: [Color(hex: "#F97316"), Color(hex: "#FB923C")], startPoint: .leading, endPoint: .trailing))
+                return AnyShapeStyle(LinearGradient(
+                    colors: [AstryxTheme.amber, Color(hex: "#FB923C")],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ))
             } else {
-                return AnyShapeStyle(LinearGradient(colors: [Color(hex: "#06B6D4").opacity(0.4), Color.white.opacity(0.12)], startPoint: .leading, endPoint: .trailing))
+                return AnyShapeStyle(AstryxTheme.activeGradient)
             }
         case .thinking:
-            return AnyShapeStyle(LinearGradient(colors: [Color(hex: "#06B6D4"), Color(hex: "#8B5CF6")], startPoint: .leading, endPoint: .trailing))
+            return AnyShapeStyle(AstryxTheme.thinkingGradient)
         case .done(_, let wasPasted):
-            return AnyShapeStyle(LinearGradient(colors: [Color(hex: wasPasted ? "#10B981" : "#F59E0B"), Color.white.opacity(0.2)], startPoint: .leading, endPoint: .trailing))
+            return AnyShapeStyle(LinearGradient(
+                colors: [wasPasted ? AstryxTheme.emerald : AstryxTheme.amber, Color.white.opacity(0.2)],
+                startPoint: .leading,
+                endPoint: .trailing
+            ))
         case .failed:
-            return AnyShapeStyle(LinearGradient(colors: [Color(hex: "#EF4444"), Color.white.opacity(0.1)], startPoint: .leading, endPoint: .trailing))
+            return AnyShapeStyle(LinearGradient(
+                colors: [AstryxTheme.red, Color.white.opacity(0.1)],
+                startPoint: .leading,
+                endPoint: .trailing
+            ))
         case .idle:
-            return AnyShapeStyle(LinearGradient(colors: [Color.white.opacity(0.18), Color.white.opacity(0.08)], startPoint: .leading, endPoint: .trailing))
+            return AnyShapeStyle(AstryxTheme.borderSubtle)
         }
     }
 
     private var pillWidth: CGFloat {
         switch dictation.phase {
-        case .listening(let locked): return locked ? 168 : 142
-        case .thinking: return 152
+        case .listening(let locked): return locked ? 168 : 136
+        case .thinking: return 106
         case .done(_, let wasPasted): return wasPasted ? 142 : 160
         case .failed: return 146
         case .idle: return 60
@@ -267,13 +243,29 @@ struct SevenWaveBarsView: View {
                     Capsule()
                         .fill(
                             isThinking
-                                ? Color(hex: "#06B6D4").opacity(0.95)
-                                : Color.white.opacity(0.92)
+                                ? AnyShapeStyle(barThinkingGradient(for: i))
+                                : AnyShapeStyle(Color.white.opacity(0.92))
                         )
                         .frame(width: 2.8, height: height)
+                        .shadow(
+                            color: isThinking ? AstryxTheme.cyan.opacity(0.35) : .clear,
+                            radius: isThinking ? 2.5 : 0
+                        )
                 }
             }
             .frame(height: 18)
         }
+    }
+
+    private func barThinkingGradient(for index: Int) -> LinearGradient {
+        let ratio = Double(index) / 6.0
+        return LinearGradient(
+            colors: [
+                AstryxTheme.cyan.opacity(1.0 - ratio * 0.25),
+                AstryxTheme.purple.opacity(0.75 + ratio * 0.25)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 }
