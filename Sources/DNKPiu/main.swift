@@ -25,18 +25,9 @@ struct AstryxMenuHeaderView: View {
                 .shadow(color: swallowColor.opacity(0.45), radius: 3)
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
-                    Text("DNK_Piu")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-
-                    Text(ThemeManager.shared.mode == .shopify ? "SHOPIFY" : "VOICE")
-                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                        .foregroundColor(AstryxTheme.accent)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(Capsule().fill(AstryxTheme.accent.opacity(0.18)))
-                }
+                Text("DNK_Piu")
+                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
 
                 Text(statusSubtitle)
                     .font(.system(size: 10, weight: .medium))
@@ -269,7 +260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             themeMenu.addItem(item)
         }
-        let themeParent = NSMenuItem(title: "Тема оформлення (Shopify / Astryx)", action: nil, keyEquivalent: "")
+        let themeParent = NSMenuItem(title: "Тема оформлення", action: nil, keyEquivalent: "")
         if let icon = NSImage(systemSymbolName: "paintbrush.fill", accessibilityDescription: nil) {
             themeParent.image = icon
         }

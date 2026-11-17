@@ -222,11 +222,15 @@ struct WisprFlowPillView: View {
                     Text(wasPasted ? "Вставлено" : "Скопійовано")
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
 
                 case .failed(let err):
                     Text(err.count > 16 ? "\(err.prefix(16))..." : err)
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
 
                 case .idle:
                     EmptyView()
@@ -286,8 +290,8 @@ struct WisprFlowPillView: View {
         switch dictation.phase {
         case .listening(let locked): return locked ? 152 : 116
         case .thinking: return 80
-        case .done(_, let wasPasted): return wasPasted ? 98 : 114
-        case .failed: return 120
+        case .done(_, let wasPasted): return wasPasted ? 124 : 138
+        case .failed: return 130
         case .idle: return 60
         }
     }

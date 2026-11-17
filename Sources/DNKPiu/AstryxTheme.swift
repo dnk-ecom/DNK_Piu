@@ -11,8 +11,8 @@ public enum AppThemeMode: String, CaseIterable, Identifiable {
 
     public var displayName: String {
         switch self {
-        case .shopify: return "Shopify Open Design (Electric Mint & Forest Teal)"
-        case .obsidian: return "Astryx Obsidian (Cold Slate & Cyan)"
+        case .shopify: return "Electric Mint & Forest Teal (За замовчуванням)"
+        case .obsidian: return "Obsidian Slate (Холодний графіт)"
         }
     }
 }

@@ -180,9 +180,9 @@ struct HistoryView: View {
                     emptyStateView
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 12) {
+                        LazyVStack(spacing: 7) {
                             ForEach(vm.filteredItems) { item in
-                                HistoryCardView(
+                                HistoryRowView(
                                     item: item,
                                     isCopied: vm.copiedId == item.id,
                                     onPaste: { onPasteItem(item) },
@@ -191,7 +191,8 @@ struct HistoryView: View {
                                 )
                             }
                         }
-                        .padding(20)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                     }
                 }
 
@@ -366,8 +367,15 @@ struct HistoryView: View {
     }
 
     private var footerBar: some View {
-        HStack {
-            Text("💡 Клікніть «Вставити», щоб перенести текст у поточний курсор")
+        HStack(spacing: 8) {
+            Text("\(vm.filteredItems.count) надиктовок")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.45))
+
+            Text("•")
+                .foregroundColor(.white.opacity(0.20))
+
+            Text("Клік «Вставити» — перенесення в активну програму")
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.40))
 
@@ -379,7 +387,7 @@ struct HistoryView: View {
                 } label: {
                     Text("Очистити все")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AstryxTheme.red.opacity(0.85))
+                        .foregroundColor(AstryxTheme.red.opacity(0.80))
                 }
                 .buttonStyle(.plain)
             }
@@ -387,8 +395,8 @@ struct HistoryView: View {
     }
 }
 
-/// Card representing a single transcribed dictation event.
-struct HistoryCardView: View {
+/// Sleek, native dictation history row (free of heavy AI-card clutter).
+struct HistoryRowView: View {
     let item: DictationItem
     let isCopied: Bool
     var onPaste: () -> Void
@@ -397,109 +405,97 @@ struct HistoryCardView: View {
     @ObservedObject private var theme = ThemeManager.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Header Row: Time, Relative Tag, App Badge & Action Buttons
-            HStack(spacing: 8) {
-                // Clock icon & exact time
-                Image(systemName: "clock")
-                    .font(.system(size: 10.5))
-                    .foregroundColor(AstryxTheme.accent)
+        HStack(alignment: .center, spacing: 14) {
+            // Main Transcript Content
+            VStack(alignment: .leading, spacing: 5) {
+                Text(item.text)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(.white.opacity(0.92))
+                    .lineSpacing(2.5)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text(item.formattedTime)
-                    .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.9))
+                HStack(spacing: 6) {
+                    Text(item.formattedTime)
+                        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.40))
 
-                Text("•  \(item.relativeTime)")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(.white.opacity(0.45))
+                    Text("•")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.25))
 
-                // App destination badge
-                HStack(spacing: 4) {
-                    Image(systemName: "app.window.checkmark")
-                        .font(.system(size: 9))
-                    Text(item.appDisplayName)
-                        .font(.system(size: 10, weight: .medium))
+                    Text(item.relativeTime)
+                        .font(.system(size: 10.5))
+                        .foregroundColor(.white.opacity(0.35))
+
+                    if !item.appDisplayName.isEmpty {
+                        Text("•")
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.25))
+
+                        Text(item.appDisplayName)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundColor(AstryxTheme.accent.opacity(0.80))
+                    }
                 }
-                .foregroundColor(AstryxTheme.purple)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2.5)
-                .background(
-                    Capsule().fill(AstryxTheme.purple.opacity(0.14))
-                )
+            }
 
-                Spacer()
+            Spacer(minLength: 8)
 
-                // Actions: Copy
+            // Compact Quick Actions
+            HStack(spacing: 6) {
+                // Quick Copy Button
                 Button {
                     onCopy()
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: isCopied ? "checkmark" : "doc.on.clipboard")
-                            .font(.system(size: 10))
-                        Text(isCopied ? "Скопійовано" : "Копіювати")
-                            .font(.system(size: 10.5, weight: .medium))
-                    }
-                    .foregroundColor(isCopied ? AstryxTheme.emerald : .white.opacity(0.75))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(AstryxTheme.elevated)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth)
-                            )
-                    )
+                    Image(systemName: isCopied ? "checkmark" : "doc.on.clipboard")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(isCopied ? AstryxTheme.shopifyMint : .white.opacity(0.60))
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Color.white.opacity(0.06)))
                 }
                 .buttonStyle(.plain)
+                .help("Скопіювати в буфер")
 
-                // Actions: Paste
+                // Quick Paste Button (↵)
                 Button {
                     onPaste()
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3) {
                         Image(systemName: "arrow.turn.down.left")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 9.5, weight: .heavy))
                         Text("Вставити")
-                            .font(.system(size: 10.5, weight: .bold))
+                            .font(.system(size: 10.5, weight: .semibold))
                     }
                     .foregroundColor(AstryxTheme.accentText)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(AstryxTheme.activeGradient)
-                    )
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4.5)
+                    .background(Capsule().fill(AstryxTheme.activeGradient))
                 }
                 .buttonStyle(.plain)
+                .help("Вставити в курсор (клік)")
 
-                // Delete button
+                // Delete Item
                 Button {
                     onDelete()
                 } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.35))
-                        .frame(width: 20, height: 20)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.white.opacity(0.30))
+                        .frame(width: 20, height: 26)
                 }
                 .buttonStyle(.plain)
                 .help("Видалити запис")
             }
-
-            // Transcript Text Body
-            Text(item.text)
-                .font(.system(size: 13, weight: .regular, design: .default))
-                .foregroundColor(.white.opacity(0.92))
-                .lineSpacing(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(AstryxTheme.card.opacity(0.95))
+            RoundedRectangle(cornerRadius: 8)
+                .fill(AstryxTheme.card.opacity(0.50))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth)
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(AstryxTheme.borderSubtle.opacity(0.6), lineWidth: AstryxTheme.borderWidth)
                 )
         )
     }
