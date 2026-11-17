@@ -40,7 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         guard let button = statusItem?.button else { return }
 
-        if let image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "DNK_Piu Voice Dictation") {
+        // Elegant swallow icon in flight (Ластівка)
+        if let image = NSImage(systemSymbolName: "swift", accessibilityDescription: "DNK_Piu (Ластівка)") {
             image.isTemplate = true
             button.image = image
         }

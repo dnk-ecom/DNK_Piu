@@ -15,8 +15,11 @@ BUILT="$(swift build -c release --package-path "$ROOT" --show-bin-path)/DNKPiu"
 echo "📦 Installing to $APP..."
 pkill -x DNKPiu 2>/dev/null || true
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BUILT" "$APP/Contents/MacOS/DNKPiu"
+if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
+  cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+fi
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -29,9 +32,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleExecutable</key><string>DNKPiu</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0.0</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundleIconName</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
-  <key>NSMicrophoneUsageDescription</key><string>DNK_Piu uses the microphone for Google Cloud Gemini 3.8 Flash voice dictation.</string>
+  <key>NSMicrophoneUsageDescription</key><string>DNK_Piu uses the microphone for Google Cloud Gemini 3.5 Flash Lite voice dictation.</string>
   <key>NSAppleEventsUsageDescription</key><string>DNK_Piu activates terminal tabs and sessions when you click the jump button.</string>
 </dict>
 </plist>
