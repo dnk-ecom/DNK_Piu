@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // 3. Start Global HotKey Monitor (Right Option hold-to-talk / double-tap hands-free)
         hotKey.start()
 
-        // 4. Setup Menubar status item with dynamic delegate
+        // 4. Setup Menubar status item with direct click toggle and right-click context menu
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
             button.title = ""
@@ -56,11 +56,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 image.isTemplate = true
                 button.image = image
             }
+            button.target = self
+            button.action = #selector(statusBarButtonClicked(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
-
-        let menu = NSMenu()
-        menu.delegate = self
-        statusItem?.menu = menu
 
         // 5. React to companion panel expansion with safe bounds animation
         store.$expanded
@@ -86,7 +85,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             .store(in: &cancellables)
     }
 
+    @objc private func statusBarButtonClicked(_ sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+            let menu = buildMenu()
+            statusItem?.menu = menu
+            sender.performClick(nil)
+            DispatchQueue.main.async { [weak self] in
+                self?.statusItem?.menu = nil
+            }
+        } else {
+            toggleVisible()
+        }
+    }
+
+    private func buildMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.delegate = self
+        populateMenu(menu)
+        return menu
+    }
+
     func menuWillOpen(_ menu: NSMenu) {
+        populateMenu(menu)
+    }
+
+    private func populateMenu(_ menu: NSMenu) {
         menu.removeAllItems()
 
         // Primary Toggle Action
@@ -113,7 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
 
         let dictateItem = NSMenuItem(
-            title: "Диктувати голосом (\(hotKey.activePreset.displayName))",
+            title: "Диктувати голосом (\(hotKey.activePreset.symbol))",
             action: #selector(toggleDictate),
             keyEquivalent: "d"
         )
@@ -204,6 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     @objc private func toggleVisible() {
         store.expanded.toggle()
+        fit(expanded: store.expanded)
     }
 
     @objc private func toggleDictate() {

@@ -37,8 +37,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-echo "🔐 Applying Ad-hoc code signature..."
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1
+echo "🔐 Applying Ad-hoc code signature with bundle id..."
+codesign --force --deep -s - -i com.dnk.piu "$APP" >/dev/null 2>&1
 
 echo "🔗 Setting up runtime hooks in $BIN..."
 mkdir -p "$BIN" "$HOME/.dnk_runtime/piu/pending" "$HOME/.dnk_runtime/piu/responses" "$HOME/.dnk_runtime/piu/sessions"

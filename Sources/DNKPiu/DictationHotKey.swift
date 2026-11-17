@@ -5,57 +5,81 @@ import PiuCore
 
 /// Supported physical hold-to-talk preset keys (like Coucou v0.6.0 FlowKey).
 public enum FlowKeyPreset: String, CaseIterable, Identifiable {
-    case rightOption = "rightOption"
-    case fn = "fn"
-    case rightCommand = "rightCommand"
-    case rightControl = "rightControl"
+    case option = "option"             // Any Option (⌥) - Left or Right!
+    case rightOption = "rightOption"   // Right Option (⌥)
+    case leftOption = "leftOption"     // Left Option (⌥)
+    case fn = "fn"                     // Fn / Globe (🌐)
+    case rightCommand = "rightCommand" // Right Command (⌘)
+    case rightControl = "rightControl" // Right Control (⌃)
 
     public var id: String { rawValue }
 
     public var displayName: String {
         switch self {
-        case .rightOption: return "Right Option (⌥)"
-        case .fn: return "Fn / Globe"
-        case .rightCommand: return "Right Command (⌘)"
-        case .rightControl: return "Right Control (⌃)"
+        case .option: return "Option (⌥ будь-який: лівий або правий)"
+        case .rightOption: return "Правий Option (Right ⌥)"
+        case .leftOption: return "Лівий Option (Left ⌥)"
+        case .fn: return "Fn / Globe (🌐)"
+        case .rightCommand: return "Правий Command (Right ⌘)"
+        case .rightControl: return "Правий Control (Right ⌃)"
         }
     }
 
     public var symbol: String {
         switch self {
-        case .rightOption: return "⌥"
+        case .option, .rightOption, .leftOption: return "⌥"
         case .fn: return "fn"
         case .rightCommand: return "⌘"
         case .rightControl: return "⌃"
         }
     }
 
-    /// Exact physical key code sent by macOS on flagsChanged.
+    /// Primary physical key code sent by macOS on flagsChanged.
     public var keyCode: UInt16 {
         switch self {
-        case .rightOption: return UInt16(kVK_RightOption) // 61
+        case .option, .rightOption: return UInt16(kVK_RightOption) // 61
+        case .leftOption: return UInt16(kVK_Option) // 58
         case .fn: return UInt16(kVK_Function) // 63
         case .rightCommand: return UInt16(kVK_RightCommand) // 54
         case .rightControl: return UInt16(kVK_RightControl) // 62
         }
     }
 
+    /// Evaluates if the incoming flagsChanged event matches this key preset.
+    public func matches(keyCode: UInt16) -> Bool {
+        switch self {
+        case .option:
+            return keyCode == UInt16(kVK_Option) || keyCode == UInt16(kVK_RightOption)
+        case .rightOption:
+            return keyCode == UInt16(kVK_RightOption)
+        case .leftOption:
+            return keyCode == UInt16(kVK_Option)
+        case .fn:
+            return keyCode == UInt16(kVK_Function)
+        case .rightCommand:
+            return keyCode == UInt16(kVK_RightCommand)
+        case .rightControl:
+            return keyCode == UInt16(kVK_RightControl)
+        }
+    }
+
     /// Evaluates if this specific modifier key is held down.
-    /// Device-dependent bits differentiate the right key from the left key.
     public func isDown(_ flags: NSEvent.ModifierFlags) -> Bool {
         let raw = flags.rawValue
         switch self {
+        case .option:
+            return flags.contains(.option)
         case .rightOption:
             // NX_DEVICERALTKEYMASK = 0x0000_0040
-            return (raw & 0x0000_0040) != 0
+            return (raw & 0x0000_0040) != 0 || (flags.contains(.option) && (raw & 0x0000_0020) == 0)
+        case .leftOption:
+            // NX_DEVICELALTKEYMASK = 0x0000_0020
+            return (raw & 0x0000_0020) != 0 || (flags.contains(.option) && (raw & 0x0000_0040) == 0)
         case .fn:
-            // kVK_Function (63) with .function flag
             return flags.contains(.function)
         case .rightCommand:
-            // NX_DEVICERCMDKEYMASK = 0x0000_0010
             return (raw & 0x0000_0010) != 0
         case .rightControl:
-            // NX_DEVICERCTLKEYMASK = 0x0000_2000
             return (raw & 0x0000_2000) != 0
         }
     }
@@ -79,13 +103,14 @@ public final class DictationHotKey: ObservableObject {
     private var keyDownTime: Double = 0
     private var lastTapUpTime: Double = 0
     private var tapTimer: DispatchWorkItem?
+    private var trustTask: Task<Void, Never>?
 
     private init() {
         if let saved = UserDefaults.standard.string(forKey: Self.keyPref),
            let preset = FlowKeyPreset(rawValue: saved) {
             self.activePreset = preset
         } else {
-            self.activePreset = .rightOption
+            self.activePreset = .option // Default to any Option (Left or Right ⌥)
         }
     }
 
@@ -112,7 +137,10 @@ public final class DictationHotKey: ObservableObject {
         guard globalMonitor == nil else { return }
 
         // Request system accessibility trust if not yet granted
-        Self.requestAccessibilityPermission()
+        if !Self.isAccessibilityGranted() {
+            Self.requestAccessibilityPermission()
+            waitForTrust()
+        }
 
         // Global monitor catches keys while another app is frontmost (Cursor, Ghostty, Terminal, Safari)
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { [weak self] event in
@@ -126,7 +154,24 @@ public final class DictationHotKey: ObservableObject {
         }
     }
 
+    private func waitForTrust() {
+        trustTask?.cancel()
+        trustTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self = self else { return }
+                if Self.isAccessibilityGranted() {
+                    self.stop()
+                    self.start()
+                    return
+                }
+            }
+        }
+    }
+
     public func stop() {
+        trustTask?.cancel()
+        trustTask = nil
         if let g = globalMonitor { NSEvent.removeMonitor(g); globalMonitor = nil }
         if let l = localMonitor { NSEvent.removeMonitor(l); localMonitor = nil }
         tapTimer?.cancel()
@@ -152,9 +197,8 @@ public final class DictationHotKey: ObservableObject {
 
         guard event.type == .flagsChanged else { return }
 
-        // CRITICAL: We ONLY handle flagsChanged events where event.keyCode matches our configured preset!
-        // This completely prevents arrow keys (123-126) and other function/modifier keys from triggering dictation.
-        guard event.keyCode == activePreset.keyCode else { return }
+        // Check if event keyCode matches our configured preset
+        guard activePreset.matches(keyCode: event.keyCode) else { return }
 
         let isDown = activePreset.isDown(event.modifierFlags)
         let uptime = ProcessInfo.processInfo.systemUptime
