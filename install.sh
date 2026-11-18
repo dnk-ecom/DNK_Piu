@@ -13,7 +13,8 @@ BUILT="$(swift build -c release --package-path "$ROOT" --show-bin-path)/DNKPiu"
 [[ -x "$BUILT" ]] || { echo "❌ Build failed."; exit 1; }
 
 echo "📦 Installing to $APP..."
-pkill -x DNKPiu 2>/dev/null || true
+killall -9 DNKPiu 2>/dev/null || pkill -9 -f "DNKPiu" 2>/dev/null || true
+sleep 0.5
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BUILT" "$APP/Contents/MacOS/DNKPiu"
@@ -67,4 +68,11 @@ if [[ -f "$ROOT/hooks/piu_history.py" ]]; then
 fi
 
 echo "✅ DNK_Piu v0.1.0 successfully installed to $APP"
-echo "👉 Launch with: open -a '$APP'"
+echo "👉 Launching DNK_Piu..."
+open -a "$APP"
+sleep 1
+if pgrep -f "DNKPiu" >/dev/null; then
+  echo "🚀 DNK_Piu launched successfully (PID: $(pgrep -f "DNKPiu" | head -n 1))"
+else
+  echo "⚠️ Could not verify DNKPiu PID, please check Console.app"
+fi

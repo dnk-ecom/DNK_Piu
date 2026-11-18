@@ -152,6 +152,16 @@ public final class DictationHotKey: ObservableObject {
             self?.handle(event: event)
             return event
         }
+
+        // Auto re-arm on system wake
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.stop()
+            self?.start()
+        }
     }
 
     private func waitForTrust() {
@@ -213,12 +223,16 @@ public final class DictationHotKey: ObservableObject {
                 tapTimer = nil
                 lastTapUpTime = 0
                 AudioDictation.shared.start(locked: true)
-            } else if AudioDictation.shared.phase == .idle {
-                keyDownTime = uptime
-                AudioDictation.shared.start(locked: false)
             } else if case .listening(let isLocked) = AudioDictation.shared.phase, isLocked {
                 // In hands-free mode, pressing the key again finishes dictation
                 AudioDictation.shared.stopAndTranscribe()
+            } else if case .listening(false) = AudioDictation.shared.phase {
+                // Already recording hold-to-talk: avoid redundant start
+                return
+            } else {
+                // Clean recovery from idle, failed, done, or lingering thinking: start fresh dictation!
+                keyDownTime = uptime
+                AudioDictation.shared.start(locked: false)
             }
         } else {
             guard isKeyDown else { return }
@@ -231,11 +245,11 @@ public final class DictationHotKey: ObservableObject {
                     return
                 }
 
-                if holdDuration >= 0.22 {
+                if holdDuration >= 0.18 {
                     // Normal hold-to-talk: user held key while speaking and let go -> STOP & TRANSCRIBE!
                     AudioDictation.shared.stopAndTranscribe()
                 } else {
-                    // Short tap (<0.22s): wait for possible second tap
+                    // Short tap (<0.18s): wait for possible second tap
                     lastTapUpTime = uptime
                     let workItem = DispatchWorkItem { [weak self] in
                         guard self != nil else { return }
@@ -246,6 +260,9 @@ public final class DictationHotKey: ObservableObject {
                     tapTimer = workItem
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.38, execute: workItem)
                 }
+            } else if AudioDictation.shared.isRecording {
+                // Safeguard: if phase desynced from isRecording, stop and transcribe anyway
+                AudioDictation.shared.stopAndTranscribe()
             }
         }
     }

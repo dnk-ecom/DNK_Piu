@@ -154,6 +154,9 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             self.targetApp = f
         }
 
+        // Clean up previous recording file to ensure clean linear PCM headers
+        try? FileManager.default.removeItem(at: recordingURL)
+
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatLinearPCM),
             AVSampleRateKey: 16000.0,
@@ -167,7 +170,18 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             recorder = try AVAudioRecorder(url: recordingURL, settings: settings)
             recorder?.isMeteringEnabled = true
             recorder?.delegate = self
-            recorder?.record()
+            guard let rec = recorder, rec.record() else {
+                recorder = nil
+                DispatchQueue.main.async {
+                    self.isRecording = false
+                    self.errorMessage = "Мікрофон недоступний або зайнятий іншим процесом"
+                    self.phase = .failed("Mic error")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                        if case .failed = self.phase { self.phase = .idle }
+                    }
+                }
+                return
+            }
             DispatchQueue.main.async {
                 self.isRecording = true
                 self.phase = .listening(isLocked: locked)
@@ -176,8 +190,11 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             }
         } catch {
             DispatchQueue.main.async {
-                self.errorMessage = "Failed to start audio recording: \(error.localizedDescription)"
+                self.errorMessage = "Помилка ініціалізації мікрофона: \(error.localizedDescription)"
                 self.phase = .failed(self.errorMessage ?? "Error")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    if case .failed = self.phase { self.phase = .idle }
+                }
             }
         }
     }
@@ -280,6 +297,15 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             self.isRecording = false
             self.isProcessing = true
             self.phase = .thinking
+
+            // Safety watchdog: never let .thinking freeze the UI if network drops
+            DispatchQueue.main.asyncAfter(deadline: .now() + 14.0) { [weak self] in
+                guard let self = self else { return }
+                if self.isProcessing || self.phase == .thinking {
+                    self.isProcessing = false
+                    self.phase = .idle
+                }
+            }
         }
 
         Task {
@@ -289,12 +315,15 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
                     self.errorMessage = "No audio recorded"
                     self.phase = .failed("No audio")
                     completion?(nil)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                         if case .failed = self.phase { self.phase = .idle }
                     }
                 }
                 return
             }
+
+            // Immediately delete the audio file after loading to prevent stale audio playback
+            try? FileManager.default.removeItem(at: self.recordingURL)
 
             let base64Audio = audioData.base64EncodedString()
             let intelligentPrompt = """
@@ -325,7 +354,7 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             var request = URLRequest(url: self.bridgeURL)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.timeoutInterval = 45.0 // Generous timeout to avoid connection cancellation
+            request.timeoutInterval = 12.0 // Fast 12-second ceiling to prevent hangs
 
             do {
                 request.httpBody = try JSONSerialization.data(withJSONObject: payload)
