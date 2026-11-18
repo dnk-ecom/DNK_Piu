@@ -141,12 +141,12 @@ public struct MenubarPopoverView: View {
     // MARK: - Dashboard Header Bar
     private var dashboardHeaderBar: some View {
         HStack(spacing: 10) {
-            // Sovereign 3D DNA Double Helix (Молекула ДНК) with real-time acoustic reactivity & absolute optical centering
+            // Sovereign 8-Bit Pixel DNA Molecule with real-time acoustic reactivity & absolute optical centering
             ZStack {
                 DNAHelixView(
                     phase: dictation.phase,
                     audioLevel: dictation.audioLevels.max() ?? 0.05,
-                    size: 22
+                    size: 24
                 )
             }
             .frame(width: 28, height: 28)

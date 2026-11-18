@@ -175,11 +175,11 @@ struct WisprFlowPillView: View {
                 )
 
             HStack(alignment: .center, spacing: 7) {
-                // Leading 3D DNA Double Helix (Молекула ДНК) with Real-Time Stream Animation
+                // Leading 8-Bit Pixel DNA (Молекула ДНК) with subtle living micro-animation
                 DNAHelixView(
                     phase: dictation.phase,
                     audioLevel: dictation.audioLevels.max() ?? 0.05,
-                    size: 16
+                    size: 18
                 )
                 .frame(width: 18, height: 18, alignment: .center)
 
