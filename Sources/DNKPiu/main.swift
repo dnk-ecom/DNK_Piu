@@ -3,108 +3,22 @@ import Combine
 import PiuCore
 import SwiftUI
 
-/// Astryx Design Style context menu header view displaying real-time status and branding.
-struct AstryxMenuHeaderView: View {
-    @ObservedObject private var dictation = AudioDictation.shared
-    @ObservedObject private var theme = ThemeManager.shared
-    let activePreset: FlowKeyPreset
-
-    var body: some View {
-        HStack(spacing: 10) {
-            // Swallow Icon Badge (Shopify Identity with Dynamic State Color)
-            Image(systemName: "swift")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(swallowColor)
-                .scaleEffect(x: -1, y: 1)
-                .frame(width: 26, height: 26)
-                .background(
-                    Circle()
-                        .fill(AstryxTheme.elevated)
-                        .overlay(Circle().stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth))
-                )
-                .shadow(color: swallowColor.opacity(0.45), radius: 3)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
-                    Text("DNK_Piu")
-                        .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-
-                    Text("v\(DNKPiuVersion.current)")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.35))
-                }
-
-                Text(statusSubtitle)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.55))
-            }
-
-            Spacer()
-
-            // Status Indicator Dot
-            Circle()
-                .fill(statusIndicatorColor)
-                .frame(width: 7, height: 7)
-                .shadow(color: statusIndicatorColor.opacity(0.8), radius: 3)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .frame(width: 250, height: 44)
-        .background(AstryxTheme.panel)
-    }
-
-    private var swallowColor: Color {
-        switch dictation.phase {
-        case .listening: return Color(hex: "#EF4444")
-        case .thinking: return Color(hex: "#3B82F6")
-        case .done: return AstryxTheme.shopifyMint
-        case .failed: return Color(hex: "#EF4444")
-        case .idle: return AstryxTheme.shopifyMint
-        }
-    }
-
-    private var statusSubtitle: String {
-        switch dictation.phase {
-        case .listening(let locked):
-            return locked ? "Hands-free запис..." : "Запис голосу..."
-        case .thinking:
-            return "Обробка Gemini..."
-        case .done:
-            return "Готово"
-        case .failed:
-            return "Помилка"
-        case .idle:
-            return "Гаряча клавіша: \(activePreset.symbol)"
-        }
-    }
-
-    private var statusIndicatorColor: Color {
-        switch dictation.phase {
-        case .listening: return Color(hex: "#EF4444")
-        case .thinking: return Color(hex: "#3B82F6")
-        case .done: return AstryxTheme.shopifyMint
-        case .failed: return Color(hex: "#EF4444")
-        case .idle: return AstryxTheme.shopifyMint
-        }
-    }
-}
-
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dictationPanel: DictationPillPanel!
     private var statusItem: NSStatusItem?
+    private var popover: NSPopover!
     private var cancellables: Set<AnyCancellable> = []
     private let hotKey = DictationHotKey.shared
     private let dictation = AudioDictation.shared
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 1. Configure dedicated floating dictation capsule pill (Astryx / Wispr Flow style)
+        // 1. Configure dedicated floating dictation capsule pill (Wispr Flow / Astryx style)
         dictationPanel = DictationPillPanel()
 
         // 2. Start Global HotKey Monitor (Hold Option to speak / double-tap for hands-free)
         hotKey.start()
 
-        // 3. Setup Menubar status item with direct click toggle and right-click context menu
+        // 3. Setup Menubar status item with modern NSPopover
         setupStatusBar()
 
         // 4. React to Dictation Phase to show/hide the pop-up capsule pill and update status icon
@@ -139,12 +53,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ) { [weak self] _ in
             self?.toggleDictate()
         }
+
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.dnk.piu.togglePopover"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self, let button = self.statusItem?.button else { return }
+            self.statusBarButtonClicked(button)
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             if url.host == "history" || url.path == "/history" {
                 HistoryWindowController.shared.showHistory()
+            } else if url.host == "menu" || url.path == "/menu" {
+                if let button = statusItem?.button {
+                    statusBarButtonClicked(button)
+                }
             }
         }
     }
@@ -175,193 +102,96 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         button.target = self
         button.action = #selector(statusBarButtonClicked(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+
+        setupPopover()
+    }
+
+    private func setupPopover() {
+        popover = NSPopover()
+        popover.contentSize = NSSize(width: 330, height: 410)
+        popover.behavior = .transient
+        popover.animates = true
+
+        let popoverView = MenubarPopoverView(
+            onOpenHistory: { [weak self] in
+                self?.closePopover()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                    HistoryWindowController.shared.showHistory()
+                }
+            },
+            onQuit: { [weak self] in
+                self?.quit()
+            }
+        )
+        popover.contentViewController = NSHostingController(rootView: popoverView)
     }
 
     @objc private func statusBarButtonClicked(_ sender: NSStatusBarButton) {
-        let menu = buildMenu()
-        statusItem?.menu = menu
-        sender.performClick(nil)
-        DispatchQueue.main.async { [weak self] in
-            self?.statusItem?.menu = nil
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp {
+            showQuickContextMenu()
+            return
         }
-    }
 
-    private func buildMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.delegate = self
-        populateMenu(menu)
-        return menu
-    }
-
-    func menuWillOpen(_ menu: NSMenu) {
-        populateMenu(menu)
-    }
-
-    private func populateMenu(_ menu: NSMenu) {
-        menu.removeAllItems()
-
-        // 1. Astryx Header Component
-        let headerItem = NSMenuItem()
-        let headerView = NSHostingView(rootView: AstryxMenuHeaderView(activePreset: hotKey.activePreset))
-        headerView.frame = NSRect(x: 0, y: 0, width: 250, height: 44)
-        headerItem.view = headerView
-        menu.addItem(headerItem)
-        menu.addItem(.separator())
-
-        // 2. Primary Voice Dictation Action
-        let dictateTitle = dictation.isRecording ? "Зупинити диктування (Розпізнати)" : "Диктувати голосом (\(hotKey.activePreset.symbol))"
-        let dictateItem = NSMenuItem(title: dictateTitle, action: #selector(toggleDictate), keyEquivalent: "d")
-        dictateItem.target = self
-        if let icon = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: nil) {
-            dictateItem.image = icon
-        }
-        menu.addItem(dictateItem)
-        menu.addItem(.separator())
-
-        // 3. Dedicated Native History Window Action (⌘H)
-        let historyWindowItem = NSMenuItem(title: "Відкрити журнал надиктовок...", action: #selector(openHistoryWindow), keyEquivalent: "h")
-        historyWindowItem.target = self
-        if let icon = NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: nil) {
-            historyWindowItem.image = icon
-        }
-        menu.addItem(historyWindowItem)
-        menu.addItem(.separator())
-
-        // 4. Quick Recent Dictated Transcripts (Click to copy / insert)
-        let sectionHeader = NSMenuItem(title: "Останні надиктовки (клік для вставки):", action: nil, keyEquivalent: "")
-        sectionHeader.isEnabled = false
-        menu.addItem(sectionHeader)
-
-        if !dictation.history.isEmpty {
-            for item in dictation.history.prefix(5) {
-                let preview = item.text.count > 34 ? "\(item.text.prefix(34))..." : item.text
-                let menuItem = NSMenuItem(title: preview, action: #selector(pasteHistoryItem(_:)), keyEquivalent: "")
-                menuItem.representedObject = item.text
-                menuItem.target = self
-                if let icon = NSImage(systemSymbolName: "text.quote", accessibilityDescription: nil) {
-                    menuItem.image = icon
-                }
-                menu.addItem(menuItem)
-            }
+        if popover.isShown {
+            closePopover()
         } else {
-            let emptyItem = NSMenuItem(title: "(Історія сесії порожня)", action: nil, keyEquivalent: "")
-            emptyItem.isEnabled = false
-            if let icon = NSImage(systemSymbolName: "waveform.slash", accessibilityDescription: nil) {
-                emptyItem.image = icon
-            }
-            menu.addItem(emptyItem)
+            showPopover()
         }
+    }
 
-        if !dictation.history.isEmpty {
-            let clearHistoryItem = NSMenuItem(title: "Очистити історію сесії", action: #selector(clearHistory), keyEquivalent: "")
-            clearHistoryItem.target = self
-            if let icon = NSImage(systemSymbolName: "trash", accessibilityDescription: nil) {
-                clearHistoryItem.image = icon
-            }
-            menu.addItem(clearHistoryItem)
+    private func showPopover() {
+        guard let button = statusItem?.button else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        if let window = popover.contentViewController?.view.window {
+            window.makeKey()
         }
-        menu.addItem(.separator())
+    }
 
-        // 5. HotKey Selection Submenu
-        let hotKeyMenu = NSMenu()
-        for preset in FlowKeyPreset.allCases {
-            let item = NSMenuItem(title: preset.displayName, action: #selector(selectHotKeyPreset(_:)), keyEquivalent: "")
-            item.representedObject = preset
-            item.target = self
-            if preset == hotKey.activePreset {
-                item.state = .on
-            }
-            hotKeyMenu.addItem(item)
-        }
-        let hotKeyParent = NSMenuItem(title: "Клавіша диктування", action: nil, keyEquivalent: "")
-        if let icon = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil) {
-            hotKeyParent.image = icon
-        }
-        hotKeyParent.submenu = hotKeyMenu
-        menu.addItem(hotKeyParent)
+    private func closePopover() {
+        popover.performClose(nil)
+    }
 
-        // 6. Theme Selection Submenu (Shopify Open Design / Astryx Obsidian)
-        let themeMenu = NSMenu()
-        for mode in AppThemeMode.allCases {
-            let item = NSMenuItem(title: mode.displayName, action: #selector(selectThemeMode(_:)), keyEquivalent: "")
-            item.representedObject = mode
-            item.target = self
-            if mode == ThemeManager.shared.mode {
-                item.state = .on
-            }
-            themeMenu.addItem(item)
-        }
-        let themeParent = NSMenuItem(title: "Тема оформлення", action: nil, keyEquivalent: "")
-        if let icon = NSImage(systemSymbolName: "paintbrush.fill", accessibilityDescription: nil) {
-            themeParent.image = icon
-        }
-        themeParent.submenu = themeMenu
-        menu.addItem(themeParent)
+    private func showQuickContextMenu() {
+        let menu = NSMenu()
 
-        // 7. Accessibility Permission Status
-        let isTrusted = DictationHotKey.isAccessibilityGranted()
-        let axTitle = isTrusted ? "Дозволи Accessibility: Надано ✓" : "Дозволи Accessibility: Потрібно надати..."
-        let accessibilityItem = NSMenuItem(title: axTitle, action: #selector(openAccessibility), keyEquivalent: "")
-        accessibilityItem.target = self
-        if let icon = NSImage(systemSymbolName: isTrusted ? "checkmark.shield.fill" : "exclamationmark.shield", accessibilityDescription: nil) {
-            accessibilityItem.image = icon
+        let historyItem = NSMenuItem(title: "Відкрити журнал надиктовок...", action: #selector(openHistoryWindow), keyEquivalent: "h")
+        if let icon = NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: nil) {
+            historyItem.image = icon
         }
-        menu.addItem(accessibilityItem)
-
-        // 8. Version information
-        let versionItem = NSMenuItem(title: "DNK_Piu v\(DNKPiuVersion.current)", action: nil, keyEquivalent: "")
-        versionItem.isEnabled = false
-        if let icon = NSImage(systemSymbolName: "info.circle", accessibilityDescription: nil) {
-            versionItem.image = icon
-        }
-        menu.addItem(versionItem)
+        historyItem.target = self
+        menu.addItem(historyItem)
 
         menu.addItem(.separator())
+
         let quitItem = NSMenuItem(title: "Вийти з DNK_Piu", action: #selector(quit), keyEquivalent: "q")
-        quitItem.target = self
         if let icon = NSImage(systemSymbolName: "power", accessibilityDescription: nil) {
             quitItem.image = icon
         }
+        quitItem.target = self
         menu.addItem(quitItem)
+
+        statusItem?.menu = menu
+        statusItem?.button?.performClick(nil)
+        DispatchQueue.main.async { [weak self] in
+            self?.statusItem?.menu = nil
+        }
     }
 
     @objc private func toggleDictate() {
         dictation.toggle()
     }
 
-    @objc private func pasteHistoryItem(_ sender: NSMenuItem) {
-        if let text = sender.representedObject as? String {
-            FlowPaste.insert(text)
-        }
-    }
-
-    @objc private func clearHistory() {
-        dictation.clearHistory()
-    }
-
     @objc private func openHistoryWindow() {
+        closePopover()
         HistoryWindowController.shared.showHistory()
-    }
-
-    @objc private func selectHotKeyPreset(_ sender: NSMenuItem) {
-        if let preset = sender.representedObject as? FlowKeyPreset {
-            hotKey.setPreset(preset)
-        }
-    }
-
-    @objc private func selectThemeMode(_ sender: NSMenuItem) {
-        if let mode = sender.representedObject as? AppThemeMode {
-            ThemeManager.shared.setMode(mode)
-        }
-    }
-
-    @objc private func openAccessibility() {
-        DictationHotKey.openAccessibilitySettings()
     }
 
     @objc private func quit() {
         hotKey.stop()
         dictationPanel?.orderOut(nil)
+        popover?.performClose(nil)
         NSApp.terminate(nil)
     }
 }
