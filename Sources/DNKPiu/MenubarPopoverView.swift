@@ -146,16 +146,10 @@ public struct MenubarPopoverView: View {
                 DNAHelixView(
                     phase: dictation.phase,
                     audioLevel: dictation.audioLevels.max() ?? 0.05,
-                    size: 24
+                    size: 26
                 )
             }
             .frame(width: 28, height: 28)
-            .background(
-                Circle()
-                    .fill(Color.white.opacity(0.04))
-                    .overlay(Circle().stroke(statusColor.opacity(0.40), lineWidth: 0.8))
-            )
-            .shadow(color: statusColor.opacity(0.25), radius: 4)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {

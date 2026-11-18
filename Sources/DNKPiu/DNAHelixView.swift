@@ -1,9 +1,9 @@
 // --- DNK-MRH-HEADER ---
 // mrh_id: "Sources/DNKPiu/DNAHelixView.swift"
-// purpose: "Sovereign Solar Duotone Acoustic Microphone with Dynamic Lifecycle & Voice Pulse."
+// purpose: "Sovereign Solar Duotone Acoustic Microphone (Zero Background, Pure Central Capsule Pulse) with Swallow Dynamic Lifecycle."
 // canonical_source: true
 // status: "Active"
-// version: "7.0.0"
+// version: "7.1.0"
 // updated_at: "2026-11-18"
 // author: "DNK-e.com Maksym & Antigravity"
 // --- END DNK-MRH-HEADER ---
@@ -13,14 +13,7 @@ import Foundation
 import PiuCore
 import SwiftUI
 
-/// Sovereign Solar Duotone Acoustic Microphone (Іконка Мікрофону).
-///
-/// States:
-/// - Idle (Не диктуємо): Червона пульсуюча (#EF4444) — м'яке спокійне дихання люмінесценції (0.84...1.0) з червоним неоновим ореолом.
-/// - Listening (Диктуємо / надиктовуємо): Інтенсивна червона акустична пульсація під гучність мікрофона audioLevel. Капсула наповнюється енергією мови, випромінюючи концентричні звукові кільця.
-/// - Thinking (Транскрибуємо через Gemini): Електричний кобальтовий синій (#3B82F6) з квантовим резонансом.
-/// - Done (Вставлено): Резонансний м'ятний спалах (#36F4A4).
-/// - Failed: Кораловий тривожний строб (#F87171).
+/// Sovereign Solar Duotone Acoustic Microphone (Чистий мікрофон без фону, пульсує лише центральна пігулка).
 public struct DNAHelixView: View {
     public let phase: DictationPhase
     public let audioLevel: Float
@@ -47,90 +40,76 @@ public struct DNAHelixView: View {
         .frame(width: size, height: size, alignment: .center)
     }
 
-    // MARK: - Metal-Accelerated Microphone Renderer
+    // MARK: - Metal-Accelerated Pure Microphone Renderer (Zero Background)
     private func renderMicrophone(context: inout GraphicsContext, size canvasSize: CGSize, time t: TimeInterval) {
         let w = canvasSize.width
         let h = canvasSize.height
         
         // Exact mathematical centering within canvas (viewBox 0 0 24 24)
-        let scale = (min(w, h) / 24.0) * 0.82
+        let scale = (min(w, h) / 24.0) * 0.90
         let ox = (w - 24.0 * scale) / 2.0
         let oy = (h - 24.0 * scale) / 2.0
 
-        let (baseColor, glowColor) = phaseColors()
+        let (baseColor, _) = phaseColors()
         let level = CGFloat(max(0.0, min(1.0, audioLevel)))
 
-        // 1. Idle Breathing vs Active Resonance
-        let breathAlpha: CGFloat
-        let breathScale: CGFloat
-        if isListening {
-            breathAlpha = 1.0
-            breathScale = 1.0 + level * 0.06 + CGFloat(sin(t * 14.0)) * 0.02
-        } else if case .thinking = phase {
-            breathAlpha = 0.90 + CGFloat(sin(t * 8.0)) * 0.10
-            breathScale = 1.0 + CGFloat(sin(t * 6.0)) * 0.03
-        } else if case .done = phase {
-            breathAlpha = 1.0
-            breathScale = 1.06
-        } else {
-            // Idle: soft red breathing
-            breathAlpha = 0.85 + CGFloat(sin(t * 2.2)) * 0.15
-            breathScale = 1.0 + CGFloat(sin(t * 2.2)) * 0.02
-        }
-
-        // 2. Ambient Core Glow
-        let micCenter = CGPoint(x: ox + 12.0 * scale, y: oy + 12.0 * scale)
-        let glowRadius: CGFloat = (isListening ? 12.0 : 7.0) * scale * (1.0 + level * 0.3)
-        let glowBounds = CGRect(x: micCenter.x - glowRadius, y: micCenter.y - glowRadius, width: glowRadius * 2, height: glowRadius * 2)
-        context.fill(Path(ellipseIn: glowBounds), with: .color(glowColor.opacity(isListening ? 0.45 : 0.20)))
-
-        // 3. Acoustic Sound Rings (Radiating when speaking)
-        if isListening && level > 0.04 {
-            let ringPhase = CGFloat(fmod(t * 2.5, 1.0))
-            let r1 = (8.0 + ringPhase * 8.0) * scale
-            let ring1Rect = CGRect(x: micCenter.x - r1, y: micCenter.y - (3.0 * scale) - r1, width: r1 * 2, height: r1 * 2)
-            let ring1Alpha = Double(max(0.0, (1.0 - ringPhase) * (0.4 + level * 0.4)))
-            context.stroke(Path(ellipseIn: ring1Rect), with: .color(glowColor.opacity(ring1Alpha)), lineWidth: 1.2 * scale)
-
-            let r2Phase = CGFloat(fmod(t * 2.5 + 0.5, 1.0))
-            let r2 = (8.0 + r2Phase * 8.0) * scale
-            let ring2Rect = CGRect(x: micCenter.x - r2, y: micCenter.y - (3.0 * scale) - r2, width: r2 * 2, height: r2 * 2)
-            let ring2Alpha = Double(max(0.0, (1.0 - r2Phase) * (0.4 + level * 0.4)))
-            context.stroke(Path(ellipseIn: ring2Rect), with: .color(glowColor.opacity(ring2Alpha)), lineWidth: 1.0 * scale)
-        }
-
-        // 4. Draw Microphone Cradle & Capsule
         let micRect = CGRect(x: ox, y: oy, width: 24.0 * scale, height: 24.0 * scale)
-        
-        var micContext = context
-        if breathScale != 1.0 {
-            micContext.translateBy(x: micCenter.x, y: micCenter.y)
-            micContext.scaleBy(x: breathScale, y: breathScale)
-            micContext.translateBy(x: -micCenter.x, y: -micCenter.y)
-        }
 
-        // Draw Solid Cradle (Stand + U-bracket)
+        // 1. Draw Steady Cradle (Stand + U-bracket) — Always solid, zero jitter, zero background
         if let cradleImg = VectorAssets.cradleImage {
-            let tintedCradle = tintImage(cradleImg, color: NSColor(baseColor).withAlphaComponent(breathAlpha))
-            micContext.draw(Image(nsImage: tintedCradle), in: micRect)
+            let tintedCradle = tintImage(cradleImg, color: NSColor(baseColor))
+            context.draw(Image(nsImage: tintedCradle), in: micRect)
         }
 
-        // Draw Duotone Capsule (Dynamic voice fill)
-        let capsuleAlpha: CGFloat
+        // 2. Draw Pulsing Central Capsule (Лише центральна пігулка пульсує)
+        // Center of capsule in viewBox: cx = 12.0, cy = 8.5
+        let capCenter = CGPoint(x: ox + 12.0 * scale, y: oy + 8.5 * scale)
+
+        let capScaleX: CGFloat
+        let capScaleY: CGFloat
+        let capAlpha: CGFloat
+        let capColor: Color
+
         if isListening {
-            capsuleAlpha = min(1.0, 0.50 + level * 0.50)
+            // Active Speech Modulation: Central capsule pulses and breathes to voice energy
+            let pulse = CGFloat(sin(t * 14.0))
+            capScaleY = 1.0 + level * 0.28 + pulse * 0.05
+            capScaleX = 1.0 + level * 0.16 + pulse * 0.03
+            capAlpha = CGFloat(min(1.0, 0.60 + level * 0.40 + Double(pulse) * 0.08))
+            // Capsule glows with fiery bright red during loud speech
+            capColor = Color(
+                red: 254 / 255.0,
+                green: min(1.0, (68.0 + level * 90.0) / 255.0),
+                blue: min(1.0, (68.0 + level * 90.0) / 255.0)
+            )
         } else if case .thinking = phase {
-            capsuleAlpha = 0.50 + CGFloat(sin(t * 10.0)) * 0.30
+            let thinkPulse = CGFloat(sin(t * 10.0))
+            capScaleY = 1.0 + thinkPulse * 0.08
+            capScaleX = 1.0 + thinkPulse * 0.04
+            capAlpha = CGFloat(0.55 + Double(thinkPulse) * 0.25)
+            capColor = baseColor
         } else if case .done = phase {
-            capsuleAlpha = 0.90
+            capScaleY = 1.06
+            capScaleX = 1.06
+            capAlpha = 1.0
+            capColor = baseColor
         } else {
-            // Idle duotone
-            capsuleAlpha = 0.45 * breathAlpha
+            // Idle: soft gentle breathing
+            let idlePulse = CGFloat(sin(t * 2.2))
+            capScaleY = 1.0 + idlePulse * 0.04
+            capScaleX = 1.0 + idlePulse * 0.02
+            capAlpha = CGFloat(0.50 + Double(idlePulse) * 0.15)
+            capColor = baseColor
         }
+
+        var capContext = context
+        capContext.translateBy(x: capCenter.x, y: capCenter.y)
+        capContext.scaleBy(x: capScaleX, y: capScaleY)
+        capContext.translateBy(x: -capCenter.x, y: -capCenter.y)
 
         if let capsuleImg = VectorAssets.capsuleImage {
-            let tintedCapsule = tintImage(capsuleImg, color: NSColor(baseColor).withAlphaComponent(capsuleAlpha))
-            micContext.draw(Image(nsImage: tintedCapsule), in: micRect)
+            let tintedCapsule = tintImage(capsuleImg, color: NSColor(capColor).withAlphaComponent(capAlpha))
+            capContext.draw(Image(nsImage: tintedCapsule), in: micRect)
         }
     }
 
