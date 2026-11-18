@@ -141,12 +141,13 @@ public struct MenubarPopoverView: View {
     // MARK: - Dashboard Header Bar
     private var dashboardHeaderBar: some View {
         HStack(spacing: 10) {
-            // Symmetrical Ukrainian Swallow (Ластівка) with dynamic state aura & absolute centering
+            // Sovereign 3D DNA Double Helix (Молекула ДНК) with real-time acoustic reactivity & absolute optical centering
             ZStack {
-                SwallowShape()
-                    .fill(statusColor)
-                    .frame(width: 15, height: 15)
-                    .shadow(color: statusColor.opacity(0.50), radius: 3)
+                DNAHelixView(
+                    phase: dictation.phase,
+                    audioLevel: dictation.audioLevels.max() ?? 0.05,
+                    size: 22
+                )
             }
             .frame(width: 28, height: 28)
             .background(

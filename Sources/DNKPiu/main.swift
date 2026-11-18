@@ -124,11 +124,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         guard let button = statusItem?.button else { return }
 
-        // Elegant swallow icon in flight (Ластівка)
-        if let image = NSImage(systemSymbolName: "swift", accessibilityDescription: "DNK_Piu (Ластівка)") {
-            image.isTemplate = true
-            button.image = image
-        }
+        // Sovereign DNA Double Helix template icon (Молекула ДНК)
+        button.image = DNAHelixView.createMenubarIcon()
         button.target = self
         button.action = #selector(statusBarButtonClicked(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])

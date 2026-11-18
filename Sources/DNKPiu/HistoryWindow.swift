@@ -332,7 +332,11 @@ struct HistoryView: View {
 
     // MARK: - Search & Filter Bar
     private var searchAndFilterBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            // Sovereign 3D DNA Brand Molecule
+            DNAHelixView(phase: .idle, audioLevel: 0.0, size: 22)
+                .frame(width: 24, height: 24)
+
             // Search Field
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
