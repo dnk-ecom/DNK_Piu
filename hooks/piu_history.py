@@ -94,6 +94,15 @@ def copy_event(index: int, hours: float = 1.0):
     print(f"✅ Скопійовано в буфер обміну [#{index}]: \"{text}\"")
 
 
+def open_gui_hud():
+    """Trigger the native macOS floating HUD via URL scheme or distributed notification."""
+    try:
+        subprocess.run(["open", "dnk-piu://history"], check=True)
+        print("🕊️ Відкрито нативний журнал надиктовок DNK_Piu (HUD).")
+    except Exception as e:
+        print(f"⚠️ Помилка виклику HUD: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="DNK_Piu Voice History Inspector")
     parser.add_argument("--hours", "-H", type=float, default=1.0, help="Фільтр за годинами (за замовчуванням: 1.0)")
@@ -101,11 +110,16 @@ def main():
     parser.add_argument("--limit", "-n", type=int, default=30, help="Максимальна кількість записів")
     parser.add_argument("--search", "-s", type=str, default=None, help="Пошук за словом чи фразою")
     parser.add_argument("--copy", "-c", type=int, default=None, help="Скопіювати запис за номером [N] в буфер")
-    parser.add_argument("--open", "-o", action="store_true", help="Відкрити JSONL файл у системному редакторі")
+    parser.add_argument("--open", "-o", "--gui", "-g", action="store_true", help="Відкрити нативний графічний HUD журнал надиктовок")
+    parser.add_argument("--jsonl", action="store_true", help="Відкрити сирий JSONL файл у системному редакторі")
 
     args = parser.parse_args()
 
     if args.open:
+        open_gui_hud()
+        return
+
+    if args.jsonl:
         subprocess.run(["open", EVENTS_FILE])
         return
 

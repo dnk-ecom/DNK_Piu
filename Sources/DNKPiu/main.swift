@@ -122,6 +122,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.updateStatusBarIcon(for: phase)
             }
             .store(in: &cancellables)
+
+        // 5. IPC listeners to show history HUD and toggle dictation from CLI/Scripts
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.dnk.piu.showHistory"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            HistoryWindowController.shared.showHistory()
+        }
+
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.dnk.piu.toggleDictate"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.toggleDictate()
+        }
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            if url.host == "history" || url.path == "/history" {
+                HistoryWindowController.shared.showHistory()
+            }
+        }
     }
 
     private func updateStatusBarIcon(for phase: DictationPhase) {
