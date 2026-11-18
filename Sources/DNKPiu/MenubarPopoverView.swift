@@ -43,48 +43,25 @@ public struct MenubarPopoverView: View {
             Color(hex: "#0C0D11").opacity(0.88)
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // 1. Header Bar
-                headerBar
-                    .padding(.horizontal, 16)
-                    .padding(.top, 14)
-                    .padding(.bottom, 12)
-
-                Divider()
-                    .background(Color.white.opacity(0.08))
-
-                // 2. Hero Interactive Voice Card
-                heroVoiceCard
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-
-                Divider()
-                    .background(Color.white.opacity(0.06))
-
-                // 3. Settings Drawer (Collapsible) or Recent Dictations
+            // Rock-solid fixed 330x410 viewport with smooth horizontal spring slide transition
+            ZStack {
                 if vm.showSettings {
-                    settingsView
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
+                    settingsScreen
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .trailing).combined(with: .opacity)
+                        ))
                 } else {
-                    recentDictationsView
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
+                    dashboardScreen
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .leading).combined(with: .opacity),
+                            removal: .move(edge: .leading).combined(with: .opacity)
+                        ))
                 }
-
-                Spacer(minLength: 0)
-
-                Divider()
-                    .background(Color.white.opacity(0.08))
-
-                // 4. Clean Footer Bar
-                footerBar
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color.black.opacity(0.20))
             }
+            .animation(.spring(response: 0.28, dampingFraction: 0.85), value: vm.showSettings)
         }
-        .frame(width: 330, height: vm.showSettings ? 460 : 410)
+        .frame(width: 330, height: 410)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -92,21 +69,92 @@ public struct MenubarPopoverView: View {
         )
     }
 
-    // MARK: - Header Bar
-    private var headerBar: some View {
+    // MARK: - Screen 1: Dashboard
+    private var dashboardScreen: some View {
+        VStack(spacing: 0) {
+            // 1. Header Bar
+            dashboardHeaderBar
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 12)
+
+            Divider()
+                .background(Color.white.opacity(0.08))
+
+            // 2. Hero Interactive Voice Card
+            heroVoiceCard
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+
+            Divider()
+                .background(Color.white.opacity(0.06))
+
+            // 3. Recent Dictations
+            recentDictationsView
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+            Spacer(minLength: 0)
+
+            Divider()
+                .background(Color.white.opacity(0.08))
+
+            // 4. Clean Footer Bar
+            footerBar
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.black.opacity(0.20))
+        }
+    }
+
+    // MARK: - Screen 2: Settings
+    private var settingsScreen: some View {
+        VStack(spacing: 0) {
+            // Settings Header Bar
+            settingsHeaderBar
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 12)
+
+            Divider()
+                .background(Color.white.opacity(0.08))
+
+            // Settings Body
+            settingsBodyView
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+
+            Spacer(minLength: 0)
+
+            Divider()
+                .background(Color.white.opacity(0.08))
+
+            // Settings Footer Bar
+            settingsFooterBar
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.black.opacity(0.20))
+        }
+    }
+
+    // MARK: - Dashboard Header Bar
+    private var dashboardHeaderBar: some View {
         HStack(spacing: 10) {
-            // Swallow Icon with dynamic state aura
-            Image(systemName: "swift")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(statusColor)
-                .scaleEffect(x: -1, y: 1)
-                .frame(width: 26, height: 26)
-                .background(
-                    Circle()
-                        .fill(Color.white.opacity(0.05))
-                        .overlay(Circle().stroke(statusColor.opacity(0.35), lineWidth: 0.8))
-                )
-                .shadow(color: statusColor.opacity(0.40), radius: 4)
+            // Swallow Icon with dynamic state aura & optical centering
+            ZStack {
+                Image(systemName: "swift")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(statusColor)
+                    .scaleEffect(x: -1, y: 1)
+                    .offset(y: 0.5) // Optical vertical centering
+            }
+            .frame(width: 26, height: 26)
+            .background(
+                Circle()
+                    .fill(Color.white.opacity(0.05))
+                    .overlay(Circle().stroke(statusColor.opacity(0.35), lineWidth: 0.8))
+            )
+            .shadow(color: statusColor.opacity(0.40), radius: 4)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
@@ -141,21 +189,63 @@ public struct MenubarPopoverView: View {
                 .buttonStyle(.plain)
                 .help("Відкрити журнал надиктовок (⌘H)")
 
-                // Toggle Settings
+                // Open Settings
                 Button {
-                    withAnimation {
-                        vm.showSettings.toggle()
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                        vm.showSettings = true
                     }
                 } label: {
-                    Image(systemName: vm.showSettings ? "xmark" : "gearshape")
+                    Image(systemName: "gearshape")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(vm.showSettings ? AstryxTheme.accent : .white.opacity(0.60))
+                        .foregroundColor(.white.opacity(0.60))
                         .frame(width: 26, height: 26)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(vm.showSettings ? AstryxTheme.accent.opacity(0.12) : Color.white.opacity(0.04)))
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.04)))
                 }
                 .buttonStyle(.plain)
-                .help(vm.showSettings ? "Закрити налаштування" : "Налаштування")
+                .help("Налаштування")
             }
+        }
+    }
+
+    // MARK: - Settings Header Bar
+    private var settingsHeaderBar: some View {
+        HStack(spacing: 8) {
+            Button {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                    vm.showSettings = false
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("Назад")
+                        .font(.system(size: 11.5, weight: .medium))
+                }
+                .foregroundColor(AstryxTheme.accent)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 6).fill(AstryxTheme.accent.opacity(0.12)))
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Text("Налаштування")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Button {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                    vm.showSettings = false
+                }
+            } label: {
+                Text("Готово")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundColor(AstryxTheme.accent)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -178,32 +268,32 @@ public struct MenubarPopoverView: View {
                     .fill(Color.white.opacity(0.04))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(statusColor.opacity(0.25), lineWidth: 0.8)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
                     )
             )
 
-            // Explanatory voice guide
+            // Status Copy & Instructions
             VStack(alignment: .leading, spacing: 3) {
                 Text(voiceCardTitle)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.95))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
 
                 Text(voiceCardDescription)
                     .font(.system(size: 10.5, weight: .regular))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(.white.opacity(0.55))
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.white.opacity(0.025))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 0.8)
+                        .stroke(statusColor.opacity(0.20), lineWidth: 0.8)
                 )
         )
     }
@@ -327,19 +417,20 @@ public struct MenubarPopoverView: View {
         }
     }
 
-    // MARK: - Settings Drawer View
-    private var settingsView: some View {
+    // MARK: - Settings Body View
+    private var settingsBodyView: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("НАЛАШТУВАННЯ")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(.white.opacity(0.35))
-                .padding(.horizontal, 2)
-
-            // Hotkey preset selector
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Клавіша активації:")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.70))
+            // Hotkey Section
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Клавіша диктування")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text("Hold-to-talk")
+                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.35))
+                }
 
                 Picker("Клавіша", selection: Binding(
                     get: { hotKey.activePreset },
@@ -352,12 +443,15 @@ public struct MenubarPopoverView: View {
                 .pickerStyle(.menu)
                 .labelsHidden()
             }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.06), lineWidth: 0.8))
 
-            // Theme preset selector
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Тема оформлення:")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.70))
+            // Theme Section
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Тема оформлення")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundColor(.white)
 
                 Picker("Тема", selection: Binding(
                     get: { theme.mode },
@@ -370,35 +464,47 @@ public struct MenubarPopoverView: View {
                 .pickerStyle(.menu)
                 .labelsHidden()
             }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.06), lineWidth: 0.8))
 
-            // Accessibility Status
-            HStack(spacing: 8) {
+            // Accessibility Status Card
+            VStack(alignment: .leading, spacing: 6) {
                 let isTrusted = DictationHotKey.isAccessibilityGranted()
-                Image(systemName: isTrusted ? "checkmark.shield.fill" : "exclamationmark.shield")
-                    .foregroundColor(isTrusted ? AstryxTheme.accent : AstryxTheme.amber)
-                    .font(.system(size: 13))
+                HStack(spacing: 8) {
+                    Image(systemName: isTrusted ? "checkmark.shield.fill" : "exclamationmark.shield")
+                        .foregroundColor(isTrusted ? AstryxTheme.accent : AstryxTheme.amber)
+                        .font(.system(size: 14))
 
-                Text(isTrusted ? "Дозволи Accessibility: Надано" : "Потрібні дозволи Accessibility")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.75))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isTrusted ? "Accessibility: Дозволено ✓" : "Потрібні дозволи")
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundColor(.white)
 
-                Spacer()
-
-                if !isTrusted {
-                    Button("Надати") {
-                        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-                        AXIsProcessTrustedWithOptions(opts)
+                        Text("Для миттєвої вставки тексту в активну програму")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.white.opacity(0.40))
                     }
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .buttonStyle(.borderedProminent)
-                    .tint(AstryxTheme.accent)
+
+                    Spacer()
+
+                    if !isTrusted {
+                        Button("Надати") {
+                            DictationHotKey.openAccessibilitySettings()
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .buttonStyle(.borderedProminent)
+                        .tint(AstryxTheme.accent)
+                    }
                 }
             }
-            .padding(.top, 4)
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.06), lineWidth: 0.8))
         }
     }
 
-    // MARK: - Footer Bar
+    // MARK: - Footers
     private var footerBar: some View {
         HStack {
             Button {
@@ -419,6 +525,29 @@ public struct MenubarPopoverView: View {
 
             Text("Клік на запис — вставка в курсор")
                 .font(.system(size: 10))
+                .foregroundColor(.white.opacity(0.35))
+        }
+    }
+
+    private var settingsFooterBar: some View {
+        HStack {
+            Button {
+                onQuit()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "power")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("Вийти з DNK_Piu")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundColor(AstryxTheme.red.opacity(0.70))
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Text("DNK_Piu v\(DNKPiuVersion.current)")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundColor(.white.opacity(0.35))
         }
     }

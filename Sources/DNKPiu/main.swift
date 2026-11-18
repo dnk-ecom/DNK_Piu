@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables: Set<AnyCancellable> = []
     private let hotKey = DictationHotKey.shared
     private let dictation = AudioDictation.shared
+    private let popoverViewModel = PopoverViewModel()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 1. Configure dedicated floating dictation capsule pill (Wispr Flow / Astryx style)
@@ -62,12 +63,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self, let button = self.statusItem?.button else { return }
             self.statusBarButtonClicked(button)
         }
+
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.dnk.piu.showSettings"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            self.popoverViewModel.showSettings = true
+            if !self.popover.isShown {
+                self.showPopover()
+            }
+        }
+
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.dnk.piu.showDashboard"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            self.popoverViewModel.showSettings = false
+            if !self.popover.isShown {
+                self.showPopover()
+            }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             if url.host == "history" || url.path == "/history" {
                 HistoryWindowController.shared.showHistory()
+            } else if url.host == "settings" || url.path == "/settings" {
+                popoverViewModel.showSettings = true
+                if !popover.isShown {
+                    showPopover()
+                }
             } else if url.host == "menu" || url.path == "/menu" {
                 if let button = statusItem?.button {
                     statusBarButtonClicked(button)
@@ -113,6 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.animates = true
 
         let popoverView = MenubarPopoverView(
+            vm: popoverViewModel,
             onOpenHistory: { [weak self] in
                 self?.closePopover()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {

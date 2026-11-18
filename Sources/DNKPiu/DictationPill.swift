@@ -80,14 +80,18 @@ struct SwallowIconView: View {
             let color = swallowColor
             let (scale, angle, yOffset) = animationParameters(t: t)
 
-            Image(systemName: "swift")
-                .font(.system(size: 11.5, weight: .bold))
-                .foregroundColor(color)
-                .scaleEffect(x: -1.0 * scale, y: scale) // Mirrored flight direction + dynamic scale
-                .rotationEffect(.degrees(angle))
-                .offset(y: yOffset)
-                .shadow(color: color.opacity(glowOpacity), radius: glowRadius)
+            ZStack(alignment: .center) {
+                Image(systemName: "swift")
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundColor(color)
+                    .scaleEffect(x: -1.0 * scale, y: scale) // Mirrored flight direction + dynamic scale
+                    .rotationEffect(.degrees(angle))
+                    .offset(y: yOffset + 0.8) // Micro optical vertical centering compensation
+                    .shadow(color: color.opacity(glowOpacity), radius: glowRadius)
+            }
+            .frame(width: 18, height: 18, alignment: .center)
         }
+        .frame(width: 18, height: 18, alignment: .center)
     }
 
     private var swallowColor: Color {
@@ -170,12 +174,13 @@ struct WisprFlowPillView: View {
                     lineWidth: isLocked ? 1.2 : AstryxTheme.borderWidth
                 )
 
-            HStack(spacing: 8) {
+            HStack(alignment: .center, spacing: 7) {
                 // Leading Swallow Bird with Micro-Transformations (Red when listening, Blue when thinking)
                 SwallowIconView(
                     phase: dictation.phase,
                     audioLevel: dictation.audioLevels.max() ?? 0.05
                 )
+                .frame(width: 18, height: 18, alignment: .center)
 
                 switch dictation.phase {
                 case .listening(let locked):
@@ -187,7 +192,7 @@ struct WisprFlowPillView: View {
                             Image(systemName: "xmark")
                                 .font(.system(size: 8.5, weight: .bold))
                                 .foregroundColor(.white.opacity(0.7))
-                                .frame(width: 17, height: 17)
+                                .frame(width: 17, height: 17, alignment: .center)
                                 .background(Circle().fill(Color.white.opacity(0.12)))
                         }
                         .buttonStyle(.plain)
@@ -195,6 +200,7 @@ struct WisprFlowPillView: View {
 
                     // 7 Dynamic Audio Waveform Bars
                     SevenWaveBarsView(levels: dictation.audioLevels, isThinking: false)
+                        .frame(height: 18, alignment: .center)
 
                     if locked {
                         // Hands-Free Finish (✓)
@@ -204,7 +210,7 @@ struct WisprFlowPillView: View {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 8.5, weight: .heavy))
                                 .foregroundColor(AstryxTheme.canvas)
-                                .frame(width: 17, height: 17)
+                                .frame(width: 17, height: 17, alignment: .center)
                                 .background(Circle().fill(AstryxTheme.emerald))
                         }
                         .buttonStyle(.plain)
@@ -212,11 +218,13 @@ struct WisprFlowPillView: View {
                         Text("⌥")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(.white.opacity(0.35))
+                            .frame(height: 18, alignment: .center)
                     }
 
                 case .thinking:
                     // Ultra-laconic: Blue Swallow + 7 Blue Wave Bars
                     SevenWaveBarsView(levels: dictation.audioLevels, isThinking: true)
+                        .frame(height: 18, alignment: .center)
 
                 case .done(_, let wasPasted):
                     Text(wasPasted ? "Вставлено" : "Скопійовано")
@@ -224,6 +232,7 @@ struct WisprFlowPillView: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
+                        .frame(height: 18, alignment: .center)
 
                 case .failed(let err):
                     Text(err.count > 16 ? "\(err.prefix(16))..." : err)
@@ -231,11 +240,13 @@ struct WisprFlowPillView: View {
                         .foregroundColor(.white.opacity(0.85))
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
+                        .frame(height: 18, alignment: .center)
 
                 case .idle:
                     EmptyView()
                 }
             }
+            .frame(height: 18, alignment: .center)
             .padding(.horizontal, isLocked ? 8 : 10)
         }
         .frame(width: pillWidth, height: 32)
