@@ -3,10 +3,9 @@ import Carbon.HIToolbox
 import Foundation
 import PiuCore
 
-/// Supported physical hold-to-talk preset keys (like Coucou v0.6.0 FlowKey).
+/// Supported physical hold-to-talk preset keys (strictly mutually exclusive single keys).
 public enum FlowKeyPreset: String, CaseIterable, Identifiable {
-    case option = "option"             // Any Option (⌥) - Left or Right!
-    case rightOption = "rightOption"   // Right Option (⌥)
+    case rightOption = "rightOption"   // Right Option (⌥) - Canonical Default!
     case leftOption = "leftOption"     // Left Option (⌥)
     case fn = "fn"                     // Fn / Globe (🌐)
     case rightCommand = "rightCommand" // Right Command (⌘)
@@ -16,7 +15,6 @@ public enum FlowKeyPreset: String, CaseIterable, Identifiable {
 
     public var displayName: String {
         switch self {
-        case .option: return "Option (⌥ будь-який: лівий або правий)"
         case .rightOption: return "Правий Option (Right ⌥)"
         case .leftOption: return "Лівий Option (Left ⌥)"
         case .fn: return "Fn / Globe (🌐)"
@@ -27,17 +25,18 @@ public enum FlowKeyPreset: String, CaseIterable, Identifiable {
 
     public var symbol: String {
         switch self {
-        case .option, .rightOption, .leftOption: return "⌥"
-        case .fn: return "fn"
-        case .rightCommand: return "⌘"
-        case .rightControl: return "⌃"
+        case .rightOption: return "⌥R"
+        case .leftOption: return "⌥L"
+        case .fn: return "🌐"
+        case .rightCommand: return "⌘R"
+        case .rightControl: return "⌃R"
         }
     }
 
     /// Primary physical key code sent by macOS on flagsChanged.
     public var keyCode: UInt16 {
         switch self {
-        case .option, .rightOption: return UInt16(kVK_RightOption) // 61
+        case .rightOption: return UInt16(kVK_RightOption) // 61
         case .leftOption: return UInt16(kVK_Option) // 58
         case .fn: return UInt16(kVK_Function) // 63
         case .rightCommand: return UInt16(kVK_RightCommand) // 54
@@ -48,8 +47,6 @@ public enum FlowKeyPreset: String, CaseIterable, Identifiable {
     /// Evaluates if the incoming flagsChanged event matches this key preset.
     public func matches(keyCode: UInt16) -> Bool {
         switch self {
-        case .option:
-            return keyCode == UInt16(kVK_Option) || keyCode == UInt16(kVK_RightOption)
         case .rightOption:
             return keyCode == UInt16(kVK_RightOption)
         case .leftOption:
@@ -63,23 +60,23 @@ public enum FlowKeyPreset: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Evaluates if this specific modifier key is held down.
+    /// Evaluates if this specific modifier key is held down (strict device-dependent hardware bitmask).
     public func isDown(_ flags: NSEvent.ModifierFlags) -> Bool {
         let raw = flags.rawValue
         switch self {
-        case .option:
-            return flags.contains(.option)
         case .rightOption:
-            // NX_DEVICERALTKEYMASK = 0x0000_0040
-            return (raw & 0x0000_0040) != 0 || (flags.contains(.option) && (raw & 0x0000_0020) == 0)
+            // NX_DEVICERALTKEYMASK = 0x0000_0040 (strictly right option only)
+            return (raw & 0x0000_0040) != 0
         case .leftOption:
-            // NX_DEVICELALTKEYMASK = 0x0000_0020
-            return (raw & 0x0000_0020) != 0 || (flags.contains(.option) && (raw & 0x0000_0040) == 0)
+            // NX_DEVICELALTKEYMASK = 0x0000_0020 (strictly left option only)
+            return (raw & 0x0000_0020) != 0
         case .fn:
             return flags.contains(.function)
         case .rightCommand:
+            // NX_DEVICERCMDKEYMASK = 0x0000_0010 (strictly right command only)
             return (raw & 0x0000_0010) != 0
         case .rightControl:
+            // NX_DEVICERCTLKEYMASK = 0x0000_2000 (strictly right control only)
             return (raw & 0x0000_2000) != 0
         }
     }
@@ -110,7 +107,7 @@ public final class DictationHotKey: ObservableObject {
            let preset = FlowKeyPreset(rawValue: saved) {
             self.activePreset = preset
         } else {
-            self.activePreset = .option // Default to any Option (Left or Right ⌥)
+            self.activePreset = .rightOption // Default to Right Option (Right ⌥) so Left Option is free!
         }
     }
 

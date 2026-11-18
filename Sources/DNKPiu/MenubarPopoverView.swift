@@ -35,12 +35,13 @@ public struct MenubarPopoverView: View {
 
     public var body: some View {
         ZStack {
-            // Native macOS Frosted HUD Glass Background
-            VisualEffectBackground(material: .hudWindow, blendingMode: .behindWindow)
+            // Solid Obsidian Dark Base guarantees crystal-sharp subpixel text antialiasing
+            Color(hex: "#0C0D11")
                 .ignoresSafeArea()
 
-            // Subtle Obsidian Dark Glass Tint
-            Color(hex: "#0C0D11").opacity(0.88)
+            // Subtle Frosted Blur Overlay
+            VisualEffectBackground(material: .hudWindow, blendingMode: .behindWindow)
+                .opacity(0.45)
                 .ignoresSafeArea()
 
             // Rock-solid fixed 330x410 viewport with smooth horizontal spring slide transition
@@ -65,7 +66,7 @@ public struct MenubarPopoverView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.10), lineWidth: 0.8)
+                .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
         )
     }
 
@@ -79,7 +80,7 @@ public struct MenubarPopoverView: View {
                 .padding(.bottom, 12)
 
             Divider()
-                .background(Color.white.opacity(0.08))
+                .background(Color.white.opacity(0.10))
 
             // 2. Hero Interactive Voice Card
             heroVoiceCard
@@ -87,7 +88,7 @@ public struct MenubarPopoverView: View {
                 .padding(.vertical, 12)
 
             Divider()
-                .background(Color.white.opacity(0.06))
+                .background(Color.white.opacity(0.08))
 
             // 3. Recent Dictations
             recentDictationsView
@@ -97,13 +98,13 @@ public struct MenubarPopoverView: View {
             Spacer(minLength: 0)
 
             Divider()
-                .background(Color.white.opacity(0.08))
+                .background(Color.white.opacity(0.10))
 
             // 4. Clean Footer Bar
             footerBar
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .background(Color.black.opacity(0.20))
+                .background(Color.black.opacity(0.25))
         }
     }
 
@@ -117,7 +118,7 @@ public struct MenubarPopoverView: View {
                 .padding(.bottom, 12)
 
             Divider()
-                .background(Color.white.opacity(0.08))
+                .background(Color.white.opacity(0.10))
 
             // Settings Body
             settingsBodyView
@@ -127,49 +128,48 @@ public struct MenubarPopoverView: View {
             Spacer(minLength: 0)
 
             Divider()
-                .background(Color.white.opacity(0.08))
+                .background(Color.white.opacity(0.10))
 
             // Settings Footer Bar
             settingsFooterBar
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .background(Color.black.opacity(0.20))
+                .background(Color.black.opacity(0.25))
         }
     }
 
     // MARK: - Dashboard Header Bar
     private var dashboardHeaderBar: some View {
         HStack(spacing: 10) {
-            // Swallow Icon with dynamic state aura & optical centering
+            // Symmetrical Ukrainian Swallow (Ластівка) with dynamic state aura & absolute centering
             ZStack {
-                Image(systemName: "swift")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(statusColor)
-                    .scaleEffect(x: -1, y: 1)
-                    .offset(y: 0.5) // Optical vertical centering
+                SwallowShape()
+                    .fill(statusColor)
+                    .frame(width: 15, height: 15)
+                    .shadow(color: statusColor.opacity(0.50), radius: 3)
             }
-            .frame(width: 26, height: 26)
+            .frame(width: 28, height: 28)
             .background(
                 Circle()
-                    .fill(Color.white.opacity(0.05))
-                    .overlay(Circle().stroke(statusColor.opacity(0.35), lineWidth: 0.8))
+                    .fill(Color.white.opacity(0.04))
+                    .overlay(Circle().stroke(statusColor.opacity(0.40), lineWidth: 0.8))
             )
-            .shadow(color: statusColor.opacity(0.40), radius: 4)
+            .shadow(color: statusColor.opacity(0.25), radius: 4)
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
+                HStack(spacing: 6) {
                     Text("DNK_Piu")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.white)
 
                     Text("v\(DNKPiuVersion.current)")
-                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.35))
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Color(hex: "#A1A1AA"))
                 }
 
                 Text(statusSubtitle)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(statusColor.opacity(0.90))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(statusColor)
             }
 
             Spacer()
@@ -182,9 +182,9 @@ public struct MenubarPopoverView: View {
                 } label: {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.60))
+                        .foregroundColor(Color(hex: "#D4D4D8"))
                         .frame(width: 26, height: 26)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.04)))
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
                 }
                 .buttonStyle(.plain)
                 .help("Відкрити журнал надиктовок (⌘H)")
@@ -197,9 +197,9 @@ public struct MenubarPopoverView: View {
                 } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.60))
+                        .foregroundColor(Color(hex: "#D4D4D8"))
                         .frame(width: 26, height: 26)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.04)))
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
                 }
                 .buttonStyle(.plain)
                 .help("Налаштування")
@@ -219,10 +219,10 @@ public struct MenubarPopoverView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 10, weight: .bold))
                     Text("Назад")
-                        .font(.system(size: 11.5, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                 }
                 .foregroundColor(AstryxTheme.accent)
-                .padding(.horizontal, 7)
+                .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(RoundedRectangle(cornerRadius: 6).fill(AstryxTheme.accent.opacity(0.12)))
             }
@@ -231,7 +231,7 @@ public struct MenubarPopoverView: View {
             Spacer()
 
             Text("Налаштування")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.white)
 
             Spacer()
@@ -242,7 +242,7 @@ public struct MenubarPopoverView: View {
                 }
             } label: {
                 Text("Готово")
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AstryxTheme.accent)
             }
             .buttonStyle(.plain)
@@ -255,20 +255,20 @@ public struct MenubarPopoverView: View {
             // Tactile HotKey Badge
             VStack(spacing: 2) {
                 Text(hotKey.activePreset.symbol)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundColor(statusColor)
 
                 Text("Клавіша")
-                    .font(.system(size: 8.5, weight: .medium))
-                    .foregroundColor(.white.opacity(0.40))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(Color(hex: "#A1A1AA"))
             }
-            .frame(width: 50, height: 50)
+            .frame(width: 52, height: 50)
             .background(
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.white.opacity(0.04))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 0.8)
                     )
             )
 
@@ -279,8 +279,8 @@ public struct MenubarPopoverView: View {
                     .foregroundColor(.white)
 
                 Text(voiceCardDescription)
-                    .font(.system(size: 10.5, weight: .regular))
-                    .foregroundColor(.white.opacity(0.55))
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(Color(hex: "#D4D4D8"))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -290,10 +290,10 @@ public struct MenubarPopoverView: View {
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.white.opacity(0.025))
+                .fill(Color.white.opacity(0.03))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(statusColor.opacity(0.20), lineWidth: 0.8)
+                        .stroke(statusColor.opacity(0.25), lineWidth: 0.8)
                 )
         )
     }
@@ -304,7 +304,7 @@ public struct MenubarPopoverView: View {
             HStack {
                 Text("ОСТАННІ НАДИКТОВКИ")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.35))
+                    .foregroundColor(Color(hex: "#A1A1AA"))
 
                 Spacer()
 
@@ -313,8 +313,8 @@ public struct MenubarPopoverView: View {
                         onOpenHistory()
                     } label: {
                         Text("Всі записи (⌘H)")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(AstryxTheme.accent.opacity(0.80))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AstryxTheme.accent)
                     }
                     .buttonStyle(.plain)
                 }
@@ -326,15 +326,15 @@ public struct MenubarPopoverView: View {
                     Spacer(minLength: 12)
                     Image(systemName: "waveform.slash")
                         .font(.system(size: 22))
-                        .foregroundColor(.white.opacity(0.20))
+                        .foregroundColor(Color(hex: "#71717A"))
 
                     Text("Історія надиктовок порожня")
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundColor(.white.opacity(0.50))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color(hex: "#D4D4D8"))
 
                     Text("Затисніть \(hotKey.activePreset.symbol) у будь-якій програмі для запису")
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.30))
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(hex: "#A1A1AA"))
                     Spacer(minLength: 12)
                 }
                 .frame(maxWidth: .infinity, minHeight: 140)
@@ -359,24 +359,24 @@ public struct MenubarPopoverView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.text)
                         .font(.system(size: 12, weight: .regular))
-                        .foregroundColor(.white.opacity(0.90))
+                        .foregroundColor(Color(hex: "#FAFAFA"))
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     HStack(spacing: 5) {
                         Text(item.relativeTime)
-                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.35))
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(Color(hex: "#A1A1AA"))
 
                         if !item.appDisplayName.isEmpty {
                             Text("•")
-                                .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.20))
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hex: "#71717A"))
 
                             Text(item.appDisplayName)
-                                .font(.system(size: 9.5, weight: .medium))
-                                .foregroundColor(AstryxTheme.accent.opacity(0.70))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(AstryxTheme.accent)
                         }
                     }
                 }
@@ -388,12 +388,12 @@ public struct MenubarPopoverView: View {
                     copyToClipboard(item)
                 } label: {
                     Image(systemName: isCopied ? "checkmark" : "doc.on.clipboard")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(isCopied ? AstryxTheme.accent : .white.opacity(0.40))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(isCopied ? AstryxTheme.accent : Color(hex: "#D4D4D8"))
                         .frame(width: 22, height: 22)
                         .background(
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(isCopied ? AstryxTheme.accent.opacity(0.12) : Color.white.opacity(0.04))
+                                .fill(isCopied ? AstryxTheme.accent.opacity(0.15) : Color.white.opacity(0.06))
                         )
                 }
                 .buttonStyle(.plain)
@@ -403,10 +403,10 @@ public struct MenubarPopoverView: View {
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 7)
-                    .fill(isHovered ? Color.white.opacity(0.06) : Color.white.opacity(0.02))
+                    .fill(isHovered ? Color.white.opacity(0.08) : Color.white.opacity(0.03))
                     .overlay(
                         RoundedRectangle(cornerRadius: 7)
-                            .stroke(isHovered ? Color.white.opacity(0.09) : Color.clear, lineWidth: 0.8)
+                            .stroke(isHovered ? Color.white.opacity(0.12) : Color.clear, lineWidth: 0.8)
                     )
             )
             .contentShape(Rectangle())
@@ -420,16 +420,16 @@ public struct MenubarPopoverView: View {
     // MARK: - Settings Body View
     private var settingsBodyView: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Hotkey Section
+            // Hotkey Section (Strict single key choice!)
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("Клавіша диктування")
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white)
                     Spacer()
                     Text("Hold-to-talk")
-                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.35))
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(Color(hex: "#A1A1AA"))
                 }
 
                 Picker("Клавіша", selection: Binding(
@@ -442,15 +442,19 @@ public struct MenubarPopoverView: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+
+                Text("Спрацьовує виключно обрана клавіша. Інша клавіша вільна для інших програм.")
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(hex: "#A1A1AA"))
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.06), lineWidth: 0.8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
 
             // Theme Section
             VStack(alignment: .leading, spacing: 6) {
                 Text("Тема оформлення")
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white)
 
                 Picker("Тема", selection: Binding(
@@ -466,7 +470,7 @@ public struct MenubarPopoverView: View {
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.06), lineWidth: 0.8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
 
             // Accessibility Status Card
             VStack(alignment: .leading, spacing: 6) {
@@ -478,12 +482,12 @@ public struct MenubarPopoverView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(isTrusted ? "Accessibility: Дозволено ✓" : "Потрібні дозволи")
-                            .font(.system(size: 11.5, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white)
 
                         Text("Для миттєвої вставки тексту в активну програму")
-                            .font(.system(size: 9.5))
-                            .foregroundColor(.white.opacity(0.40))
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hex: "#A1A1AA"))
                     }
 
                     Spacer()
@@ -500,7 +504,7 @@ public struct MenubarPopoverView: View {
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.06), lineWidth: 0.8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
         }
     }
 
@@ -516,7 +520,7 @@ public struct MenubarPopoverView: View {
                     Text("Вийти")
                         .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundColor(AstryxTheme.red.opacity(0.70))
+                .foregroundColor(AstryxTheme.red.opacity(0.85))
             }
             .buttonStyle(.plain)
             .help("Вийти з DNK_Piu (⌘Q)")
@@ -524,8 +528,8 @@ public struct MenubarPopoverView: View {
             Spacer()
 
             Text("Клік на запис — вставка в курсор")
-                .font(.system(size: 10))
-                .foregroundColor(.white.opacity(0.35))
+                .font(.system(size: 11))
+                .foregroundColor(Color(hex: "#A1A1AA"))
         }
     }
 
@@ -540,7 +544,7 @@ public struct MenubarPopoverView: View {
                     Text("Вийти з DNK_Piu")
                         .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundColor(AstryxTheme.red.opacity(0.70))
+                .foregroundColor(AstryxTheme.red.opacity(0.85))
             }
             .buttonStyle(.plain)
 
@@ -548,7 +552,7 @@ public struct MenubarPopoverView: View {
 
             Text("DNK_Piu v\(DNKPiuVersion.current)")
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundColor(.white.opacity(0.35))
+                .foregroundColor(Color(hex: "#A1A1AA"))
         }
     }
 

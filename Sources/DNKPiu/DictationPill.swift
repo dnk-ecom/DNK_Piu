@@ -81,12 +81,12 @@ struct SwallowIconView: View {
             let (scale, angle, yOffset) = animationParameters(t: t)
 
             ZStack(alignment: .center) {
-                Image(systemName: "swift")
-                    .font(.system(size: 11.5, weight: .bold))
-                    .foregroundColor(color)
-                    .scaleEffect(x: -1.0 * scale, y: scale) // Mirrored flight direction + dynamic scale
+                SwallowShape()
+                    .fill(color)
+                    .frame(width: 13, height: 13)
+                    .scaleEffect(scale)
                     .rotationEffect(.degrees(angle))
-                    .offset(y: yOffset + 0.8) // Micro optical vertical centering compensation
+                    .offset(y: yOffset)
                     .shadow(color: color.opacity(glowOpacity), radius: glowRadius)
             }
             .frame(width: 18, height: 18, alignment: .center)
@@ -215,9 +215,9 @@ struct WisprFlowPillView: View {
                         }
                         .buttonStyle(.plain)
                     } else {
-                        Text("⌥")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.35))
+                        Text(DictationHotKey.shared.activePreset.symbol)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(Color(hex: "#A1A1AA"))
                             .frame(height: 18, alignment: .center)
                     }
 
@@ -228,7 +228,7 @@ struct WisprFlowPillView: View {
 
                 case .done(_, let wasPasted):
                     Text(wasPasted ? "Вставлено" : "Скопійовано")
-                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
@@ -236,8 +236,8 @@ struct WisprFlowPillView: View {
 
                 case .failed(let err):
                     Text(err.count > 16 ? "\(err.prefix(16))..." : err)
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundColor(.white.opacity(0.85))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                         .frame(height: 18, alignment: .center)

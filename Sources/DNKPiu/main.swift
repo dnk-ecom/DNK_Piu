@@ -154,7 +154,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.quit()
             }
         )
-        popover.contentViewController = NSHostingController(rootView: popoverView)
+        let hostingController = NSHostingController(rootView: popoverView)
+        hostingController.view.wantsLayer = true
+        hostingController.view.layer?.shouldRasterize = false
+        popover.contentViewController = hostingController
     }
 
     @objc private func statusBarButtonClicked(_ sender: NSStatusBarButton) {
