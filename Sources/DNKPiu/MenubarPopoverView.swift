@@ -564,7 +564,7 @@ public struct MenubarPopoverView: View {
         case .thinking: return Color(hex: "#3B82F6")
         case .done: return AstryxTheme.shopifyMint
         case .failed: return Color(hex: "#EF4444")
-        case .idle: return AstryxTheme.shopifyMint
+        case .idle: return Color(hex: "#EF4444")
         }
     }
 

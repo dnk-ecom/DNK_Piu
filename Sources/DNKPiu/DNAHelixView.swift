@@ -1,9 +1,9 @@
 // --- DNK-MRH-HEADER ---
 // mrh_id: "Sources/DNKPiu/DNAHelixView.swift"
-// purpose: "Sovereign 8-Bit Pixel Cybernetic DNA Molecule with Subtle Acoustic & State Reactivity."
+// purpose: "Sovereign 7x11 Bold Minimal Cybernetic DNA Molecule with Swallow-Matched Dynamic Phase Colors & Red Idle Pulse."
 // canonical_source: true
 // status: "Active"
-// version: "2.1.0"
+// version: "3.0.0"
 // updated_at: "2026-11-18"
 // author: "DNK-e.com Maksym & Antigravity"
 // --- END DNK-MRH-HEADER ---
@@ -13,96 +13,100 @@ import Foundation
 import PiuCore
 import SwiftUI
 
-/// High-performance, Metal-accelerated 8-Bit Pixel Cybernetic DNA Molecule (Біо-кібернетична молекула ДНК)
-/// Meticulously matching the sovereign DNK brand identity with subtle micro-animations for the floating pill and HUD.
-///
-/// States:
-/// - Idle: Gentle breathing luminescence (0.85...1.0) + subtle traveling cyan rung shimmer (living code).
-/// - Listening: Real-time voice acoustic reactivity — cyan base-pair rungs pulse and expand with microphone audioLevel.
-/// - Thinking: Upward quantum data cascade in Electric Blue (#3B82F6) & Sky Cyan (#38BDF8).
-/// - Done: Resonant harmonic mint flash (#36F4A4).
-/// - Failed: Coral warning pulse (#EF4444).
+/// High-performance, Metal-accelerated Minimal 7x11 Cybernetic DNA Molecule (Лаконічна цифрова ДНК).
+/// Matches the iconic dynamic color lifecycle of the Swallow (Ластівка):
+/// - Idle (Не диктуємо): Червона пульсуюча (#EF4444) — спокійне дихання люмінесценції (0.82...1.0) з червоним неоновим ореолом.
+/// - Listening (Диктуємо / надиктовуємо): Інтенсивна червона акустична пульсація (#EF4444) з білим серцевинним спалахом під гучність мікрофона.
+/// - Thinking (Транскрибуємо): Електричний синій (#3B82F6) з квантовим потоком біжучих даних.
+/// - Done (Вставлено): Резонансний м'ятний спалах (#36F4A4).
+/// - Failed: Кораловий тривожний строб.
 public struct DNAHelixView: View {
     public let phase: DictationPhase
     public let audioLevel: Float
     public let size: CGFloat
 
-    // Canonical 8-Bit Pixel Grid coordinates (9 columns wide: 1...9, 18 rows high: 1...18)
+    // Canonical 7x11 Minimal Pixel Grid (7 columns: 0...6, 11 rows: 0...10, center is 3)
     private static let strandPixels: [(row: Int, col: Int)] = [
-        // Loop 1 Top
-        (1, 1), (1, 2), (1, 8), (1, 9),
-        (2, 2), (2, 3), (2, 7), (2, 8),
-        (3, 3), (3, 4), (3, 6), (3, 7),
-        (4, 4), (4, 5), (4, 6),
-        // Node 1 (Center crossing)
-        (5, 5), (5, 6),
-        // Loop 1 Bottom / Loop 2 Top
-        (6, 4), (6, 5), (6, 6),
-        (7, 3), (7, 4), (7, 6), (7, 7),
-        (8, 2), (8, 3), (8, 7), (8, 8),
-        (9, 1), (9, 2), (9, 8), (9, 9),
-        // Loop 2 Mid
-        (10, 1), (10, 2), (10, 8), (10, 9),
-        (11, 2), (11, 3), (11, 7), (11, 8),
-        (12, 3), (12, 4), (12, 6), (12, 7),
-        (13, 4), (13, 5), (13, 6),
-        // Node 2 (Center crossing)
-        (14, 5), (14, 6),
-        // Loop 2 Bottom
-        (15, 4), (15, 5), (15, 6),
-        (16, 3), (16, 4), (16, 6), (16, 7),
-        (17, 2), (17, 3), (17, 7), (17, 8),
-        (18, 1), (18, 2), (18, 8), (18, 9),
+        // Top loop & terminals
+        (0, 0), (0, 1), (0, 5), (0, 6),
+        (1, 1), (1, 5),
+        (2, 2), (2, 4),
+        // Node 1 (Center crossover)
+        (3, 3),
+        // Center diamond loop
+        (4, 2), (4, 4),
+        (5, 1), (5, 5),
+        (6, 1), (6, 5),
+        (7, 2), (7, 4),
+        // Node 2 (Center crossover)
+        (8, 3),
+        // Bottom loop & terminals
+        (9, 2), (9, 4),
+        (10, 0), (10, 1), (10, 5), (10, 6),
     ]
 
-    // Connecting horizontal base pairs (Sky Cyan)
-    private static let rungRows: [Int] = [2, 8, 11, 17]
-    private static let rungCols: [Int] = [4, 5, 6]
+    // Connecting horizontal base-pair rungs
+    private static let rungPixels: [(row: Int, col: Int)] = [
+        // Rung 1 (Top loop)
+        (1, 2), (1, 3), (1, 4),
+        // Center diamond rungs
+        (4, 3),
+        (5, 2), (5, 3), (5, 4),
+        (6, 2), (6, 3), (6, 4),
+        (7, 3),
+        // Rung 4 (Bottom loop)
+        (9, 3)
+    ]
 
-    public init(phase: DictationPhase = .idle, audioLevel: Float = 0.0, size: CGFloat = 20.0) {
+    public init(phase: DictationPhase = .idle, audioLevel: Float = 0.0, size: CGFloat = 18.0) {
         self.phase = phase
         self.audioLevel = audioLevel
         self.size = size
+    }
+
+    private var isListening: Bool {
+        if case .listening = phase { return true }
+        return false
     }
 
     public var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, canvasSize in
-                renderPixelDNA(context: &context, size: canvasSize, time: t)
+                renderMinimalDNA(context: &context, size: canvasSize, time: t)
             }
         }
         .frame(width: size, height: size, alignment: .center)
     }
 
-    // MARK: - Metal-Accelerated Pixel DNA Renderer
-    private func renderPixelDNA(context: inout GraphicsContext, size canvasSize: CGSize, time t: TimeInterval) {
+    // MARK: - Metal-Accelerated Minimal DNA Renderer
+    private func renderMinimalDNA(context: inout GraphicsContext, size canvasSize: CGSize, time t: TimeInterval) {
         let w = canvasSize.width
         let h = canvasSize.height
 
-        let gridCols: CGFloat = 9.0
-        let gridRows: CGFloat = 18.0
+        let gridCols: CGFloat = 7.0
+        let gridRows: CGFloat = 11.0
 
-        // Scale to fit canvas with optimal tight margins
-        let cellSize = min(w / (gridCols + 1.2), h / (gridRows + 0.6))
+        // Chunky pixel sizing with optimal margins
+        let cellSize = min(w / (gridCols + 0.8), h / (gridRows + 0.6))
         let gridW = gridCols * cellSize
         let gridH = gridRows * cellSize
 
         // Absolute optical centering
-        let ox = (w - gridW) / 2.0 - (1.0 * cellSize)
-        let oy = (h - gridH) / 2.0 - (1.0 * cellSize)
+        let ox = (w - gridW) / 2.0
+        let oy = (h - gridH) / 2.0
 
-        let pixelGap = max(0.3, cellSize * 0.08)
-        let cornerRadius = max(0.4, cellSize * 0.14)
+        let pixelGap = max(0.4, cellSize * 0.08)
+        let cornerRadius = max(0.6, cellSize * 0.16)
 
-        // Palette resolution
-        let (strandBaseColor, rungBaseColor, _) = phaseColors()
+        let (strandBaseColor, rungBaseColor, glowColor) = phaseColors()
 
-        // 1. Calculate animation parameters
+        // 1. Calculate breathing & pulse animation parameters
         let breathAlpha: Double = {
             switch phase {
             case .idle:
-                return 0.86 + 0.14 * sin(t * 2.2)
+                // Red pulsating when not dictating (дихання люмінесценції)
+                return 0.82 + 0.18 * sin(t * 3.2)
             case .listening:
                 let vol = Double(min(1.0, max(0.0, audioLevel)))
                 return 0.90 + 0.10 * vol
@@ -111,7 +115,7 @@ public struct DNAHelixView: View {
             case .done:
                 return 1.0
             case .failed:
-                return 0.75 + 0.25 * sin(t * 12.0)
+                return 0.70 + 0.30 * sin(t * 14.0)
             }
         }()
 
@@ -123,75 +127,82 @@ public struct DNAHelixView: View {
             return 0.0
         }()
 
-        // Rung shimmer index for idle state (traveling light pulse across 4 rungs)
-        let activeShimmerRungIndex: Int = {
-            if case .idle = phase {
-                let cycle = (t * 0.8).truncatingRemainder(dividingBy: 1.0)
-                return Int(cycle * 4.0)
+        // Scale effect for voice pulse
+        let dynamicScale: CGFloat = {
+            if case .listening = phase {
+                return 1.0 + volumeBoost * 0.12
             }
-            return -1
+            return 1.0
         }()
 
-        // Thinking quantum cascade phase
+        // Thinking quantum cascade row (cycles 0...10)
         let thinkingCascadeRow: Int = {
             if case .thinking = phase {
-                return Int((t * 14.0).truncatingRemainder(dividingBy: 18.0)) + 1
+                return Int((t * 10.0).truncatingRemainder(dividingBy: 11.0))
             }
             return -1
         }()
 
-        // Ambient cyber glow pass in center
-        let glowRect = CGRect(x: w * 0.15, y: h * 0.15, width: w * 0.7, height: h * 0.7)
-        context.fill(Path(ellipseIn: glowRect), with: .color(strandBaseColor.opacity(0.18 * breathAlpha)))
+        // 2. Ambient Glow Pass
+        let glowRadius = min(w, h) * (phase == .idle ? 0.38 : (isListening ? 0.44 : 0.35))
+        let glowRect = CGRect(
+            x: (w - glowRadius * 2) / 2.0,
+            y: (h - glowRadius * 2) / 2.0,
+            width: glowRadius * 2,
+            height: glowRadius * 2
+        )
+        context.fill(Path(ellipseIn: glowRect), with: .color(glowColor.opacity(0.22 * breathAlpha)))
 
-        // --- DRAW RUNGS (Base Pairs) ---
-        for (idx, r) in Self.rungRows.enumerated() {
-            let isShimmerActive = (idx == activeShimmerRungIndex)
+        // Center transform for dynamic scale
+        if dynamicScale != 1.0 {
+            context.translateBy(x: w / 2.0, y: h / 2.0)
+            context.scaleBy(x: dynamicScale, y: dynamicScale)
+            context.translateBy(x: -w / 2.0, y: -h / 2.0)
+        }
+
+        // --- DRAW RUNGS (Horizontal Base Pairs) ---
+        for (r, c) in Self.rungPixels {
             let isThinkingNear = abs(r - thinkingCascadeRow) <= 1
 
             let rungBrightness: Double = {
                 if case .listening = phase {
-                    return 0.90 + Double(volumeBoost) * 0.35
-                } else if isShimmerActive {
-                    return 1.0
+                    return 0.90 + Double(volumeBoost) * 0.30
                 } else if isThinkingNear {
                     return 1.0
                 }
-                return 0.82
+                return 0.85
             }()
 
             let rungColor: Color = {
                 if isThinkingNear {
                     return Color.white
-                } else if isShimmerActive {
-                    return Color(hex: "#7DD3FC") // Brighter Ice Cyan
+                } else if case .listening = phase {
+                    return volumeBoost > 0.35 ? Color.white : rungBaseColor
                 } else {
                     return rungBaseColor
                 }
             }()
 
-            for c in Self.rungCols {
-                let px = ox + CGFloat(c) * cellSize
-                let py = oy + CGFloat(r) * cellSize
-                let rect = CGRect(
-                    x: px + pixelGap / 2.0,
-                    y: py + pixelGap / 2.0,
-                    width: cellSize - pixelGap,
-                    height: cellSize - pixelGap
-                )
+            let px = ox + CGFloat(c) * cellSize
+            let py = oy + CGFloat(r) * cellSize
+            let rect = CGRect(
+                x: px + pixelGap / 2.0,
+                y: py + pixelGap / 2.0,
+                width: cellSize - pixelGap,
+                height: cellSize - pixelGap
+            )
 
-                let path = Path(roundedRect: rect, cornerRadius: cornerRadius)
-                context.fill(path, with: .color(rungColor.opacity(breathAlpha * rungBrightness)))
+            let path = Path(roundedRect: rect, cornerRadius: cornerRadius)
+            context.fill(path, with: .color(rungColor.opacity(breathAlpha * rungBrightness)))
 
-                // Top specular highlight
-                let glintRect = CGRect(
-                    x: rect.minX + 0.2,
-                    y: rect.minY + 0.2,
-                    width: rect.width - 0.4,
-                    height: max(0.4, rect.height * 0.25)
-                )
-                context.fill(Path(glintRect), with: .color(Color.white.opacity(0.35)))
-            }
+            // Specular glint
+            let glintRect = CGRect(
+                x: rect.minX + 0.3,
+                y: rect.minY + 0.2,
+                width: rect.width - 0.6,
+                height: max(0.4, rect.height * 0.25)
+            )
+            context.fill(Path(glintRect), with: .color(Color.white.opacity(0.35)))
         }
 
         // --- DRAW DOUBLE HELIX STRANDS ---
@@ -205,16 +216,14 @@ public struct DNAHelixView: View {
                 height: cellSize - pixelGap
             )
 
-            // Thinking stream highlight
-            let isThinkingActive = (r == thinkingCascadeRow || (r + 18 - thinkingCascadeRow) % 18 == 1)
+            let isThinkingActive = (r == thinkingCascadeRow)
 
             let pixelColor: Color = {
                 if isThinkingActive {
                     return Color.white
                 } else if case .listening = phase {
-                    // Voice reactive brightness boost
-                    if volumeBoost > 0.4 && (c == 5 || c == 6) {
-                        return Color(hex: "#F59E0B") // Amber core sparkle on voice peaks
+                    if volumeBoost > 0.4 && (r == 3 || r == 8) {
+                        return Color.white // Crossover nodes ignite white on voice peaks
                     }
                     return strandBaseColor
                 } else {
@@ -227,54 +236,54 @@ public struct DNAHelixView: View {
             let path = Path(roundedRect: rect, cornerRadius: cornerRadius)
             context.fill(path, with: .color(pixelColor.opacity(pixelAlpha)))
 
-            // Specular glint on pixel top for crisp 3D cyber-chip texture
+            // Specular glint on pixel top for chunky 3D cyber-chip texture
             let glintRect = CGRect(
-                x: rect.minX + 0.2,
+                x: rect.minX + 0.3,
                 y: rect.minY + 0.2,
-                width: rect.width - 0.4,
+                width: rect.width - 0.6,
                 height: max(0.4, rect.height * 0.25)
             )
-            context.fill(Path(glintRect), with: .color(Color.white.opacity(0.32)))
+            context.fill(Path(glintRect), with: .color(Color.white.opacity(0.35)))
         }
     }
 
-    // MARK: - Color Palette Mapping
+    // MARK: - Color Palette Matching the Swallow (Ластівка)
     private func phaseColors() -> (strand: Color, rung: Color, glow: Color) {
         switch phase {
-        case .listening:
-            // Electric Mint & Bright Voice Cyan
+        case .idle:
+            // Червона пульсуюча коли не диктуємо (#EF4444)
             return (
-                AstryxTheme.shopifyMint,
-                Color(hex: "#38BDF8"),
-                AstryxTheme.shopifyMint
+                Color(hex: "#EF4444"),
+                Color(hex: "#FECACA"),
+                Color(hex: "#EF4444")
+            )
+        case .listening:
+            // Інтенсивний червоний з білим еквалайзером при вимові (#EF4444)
+            return (
+                Color(hex: "#EF4444"),
+                Color(hex: "#FCA5A5"),
+                Color(hex: "#EF4444")
             )
         case .thinking:
-            // Electric Blue & Cyan Quantum Flow
+            // Електричний синій (#3B82F6) як ширяюча ластівка
             return (
                 Color(hex: "#3B82F6"),
-                Color(hex: "#38BDF8"),
-                Color(hex: "#60A5FA")
+                Color(hex: "#93C5FD"),
+                Color(hex: "#3B82F6")
             )
         case .done:
-            // Pure Electric Mint Harmonic
+            // Фірмовий електричний м'ятний (#36F4A4)
             return (
                 AstryxTheme.shopifyMint,
-                AstryxTheme.shopifyMint,
+                Color.white,
                 AstryxTheme.shopifyMint
             )
         case .failed:
-            // Coral Warning
+            // Кораловий тривожний
             return (
                 Color(hex: "#EF4444"),
                 Color(hex: "#DC2626"),
                 Color(hex: "#EF4444")
-            )
-        case .idle:
-            // Sovereign Electric Mint (#36F4A4) & Sky Cyan (#38BDF8)
-            return (
-                AstryxTheme.shopifyMint,
-                Color(hex: "#38BDF8"),
-                AstryxTheme.shopifyMint
             )
         }
     }
@@ -287,36 +296,34 @@ public struct DNAHelixView: View {
             let w = size.width
             let h = size.height
 
-            let gridCols: CGFloat = 9.0
-            let gridRows: CGFloat = 18.0
+            let gridCols: CGFloat = 7.0
+            let gridRows: CGFloat = 11.0
 
-            let cellSize = min(w / (gridCols + 1.2), h / (gridRows + 0.6))
+            let cellSize = min(w / (gridCols + 0.8), h / (gridRows + 0.6))
             let gridW = gridCols * cellSize
             let gridH = gridRows * cellSize
 
-            let ox = (w - gridW) / 2.0 - (1.0 * cellSize)
-            let oy = (h - gridH) / 2.0 - (1.0 * cellSize)
+            let ox = (w - gridW) / 2.0
+            let oy = (h - gridH) / 2.0
 
-            let pixelGap = max(0.3, cellSize * 0.08)
-            let cornerRadius = max(0.4, cellSize * 0.14)
+            let pixelGap = max(0.4, cellSize * 0.08)
+            let cornerRadius = max(0.5, cellSize * 0.16)
 
             ctx.setFillColor(NSColor.black.cgColor)
 
             // Draw Rungs
-            for r in Self.rungRows {
-                for c in Self.rungCols {
-                    let px = ox + CGFloat(c) * cellSize
-                    let py = oy + CGFloat(r) * cellSize
-                    let rRect = CGRect(
-                        x: px + pixelGap / 2.0,
-                        y: py + pixelGap / 2.0,
-                        width: cellSize - pixelGap,
-                        height: cellSize - pixelGap
-                    )
-                    let path = CGPath(roundedRect: rRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
-                    ctx.addPath(path)
-                    ctx.fillPath()
-                }
+            for (r, c) in Self.rungPixels {
+                let px = ox + CGFloat(c) * cellSize
+                let py = oy + CGFloat(r) * cellSize
+                let rRect = CGRect(
+                    x: px + pixelGap / 2.0,
+                    y: py + pixelGap / 2.0,
+                    width: cellSize - pixelGap,
+                    height: cellSize - pixelGap
+                )
+                let path = CGPath(roundedRect: rRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
+                ctx.addPath(path)
+                ctx.fillPath()
             }
 
             // Draw Strands
