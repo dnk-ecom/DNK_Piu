@@ -180,7 +180,7 @@ struct HistoryView: View {
                     emptyStateView
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 7) {
+                        LazyVStack(spacing: 5) {
                             ForEach(vm.filteredItems) { item in
                                 HistoryRowView(
                                     item: item,
@@ -191,8 +191,8 @@ struct HistoryView: View {
                                 )
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
                     }
                 }
 
@@ -224,23 +224,23 @@ struct HistoryView: View {
 
     private var headerBar: some View {
         HStack(spacing: 10) {
-            // Swallow Icon Badge (Astryx Identity)
+            // Swallow Icon Badge
             Image(systemName: "swift")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(AstryxTheme.swallowGradient)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(AstryxTheme.accent)
                 .scaleEffect(x: -1, y: 1)
 
             Text("Журнал надиктовок")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundColor(.white)
 
             // Badge count
             Text("\(vm.filteredItems.count)")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                 .foregroundColor(AstryxTheme.accent)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(AstryxTheme.accent.opacity(0.15)))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1.5)
+                .background(Capsule().fill(AstryxTheme.accent.opacity(0.12)))
 
             Spacer()
 
@@ -249,14 +249,10 @@ struct HistoryView: View {
                 vm.refresh()
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
-                    .frame(width: 26, height: 26)
-                    .background(
-                        Circle()
-                            .fill(AstryxTheme.elevated)
-                            .overlay(Circle().stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth))
-                    )
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.55))
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(Color.white.opacity(0.06)))
             }
             .buttonStyle(.plain)
             .help("Оновити записи")
@@ -266,14 +262,10 @@ struct HistoryView: View {
                 onClose()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.white.opacity(0.7))
-                    .frame(width: 26, height: 26)
-                    .background(
-                        Circle()
-                            .fill(AstryxTheme.elevated)
-                            .overlay(Circle().stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth))
-                    )
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundColor(.white.opacity(0.55))
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(Color.white.opacity(0.06)))
             }
             .buttonStyle(.plain)
             .help("Закрити (Esc)")
@@ -281,14 +273,14 @@ struct HistoryView: View {
     }
 
     private var filterBar: some View {
-        VStack(spacing: 10) {
-            // Search Input with Astryx Elevated Surface and 0.8px Border
+        VStack(spacing: 8) {
+            // Search Input with clean Apple-style styling
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(.white.opacity(0.35))
 
-                TextField("Пошук по тексту надиктовок або програмі...", text: $vm.searchText)
+                TextField("Пошук по тексту надиктовок...", text: $vm.searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12.5))
                     .foregroundColor(.white)
@@ -298,8 +290,8 @@ struct HistoryView: View {
                         vm.searchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.45))
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.40))
                     }
                     .buttonStyle(.plain)
                 }
@@ -307,11 +299,11 @@ struct HistoryView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(AstryxTheme.elevated)
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(Color.white.opacity(0.04))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(AstryxTheme.borderSubtle, lineWidth: AstryxTheme.borderWidth)
+                        RoundedRectangle(cornerRadius: 7)
+                            .stroke(Color.white.opacity(0.07), lineWidth: 0.8)
                     )
             )
 
@@ -322,19 +314,16 @@ struct HistoryView: View {
                         vm.selectedFilter = filter
                     } label: {
                         Text(filter.rawValue)
-                            .font(.system(size: 11.5, weight: vm.selectedFilter == filter ? .semibold : .regular))
-                            .foregroundColor(vm.selectedFilter == filter ? .white : .white.opacity(0.60))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 5)
+                            .font(.system(size: 11, weight: vm.selectedFilter == filter ? .semibold : .regular))
+                            .foregroundColor(vm.selectedFilter == filter ? .white : .white.opacity(0.45))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
                             .background(
                                 Capsule()
-                                    .fill(vm.selectedFilter == filter ? AstryxTheme.accent.opacity(0.20) : AstryxTheme.card)
+                                    .fill(vm.selectedFilter == filter ? Color.white.opacity(0.12) : Color.white.opacity(0.03))
                                     .overlay(
                                         Capsule()
-                                            .stroke(
-                                                vm.selectedFilter == filter ? AstryxTheme.accent.opacity(0.55) : AstryxTheme.borderSubtle,
-                                                lineWidth: AstryxTheme.borderWidth
-                                            )
+                                            .stroke(vm.selectedFilter == filter ? Color.white.opacity(0.18) : Color.clear, lineWidth: 0.8)
                                     )
                             )
                     }
@@ -367,19 +356,41 @@ struct HistoryView: View {
     }
 
     private var footerBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             Text("\(vm.filteredItems.count) надиктовок")
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundColor(.white.opacity(0.45))
-
-            Text("•")
-                .foregroundColor(.white.opacity(0.20))
-
-            Text("Клік «Вставити» — перенесення в активну програму")
-                .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.40))
 
             Spacer()
+
+            // Raycast-style action guides
+            HStack(spacing: 10) {
+                HStack(spacing: 4) {
+                    Text("Клік / ↵")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.08)))
+                        .foregroundColor(.white.opacity(0.80))
+
+                    Text("Вставити")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.50))
+                }
+
+                HStack(spacing: 4) {
+                    Text("⌘C")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.08)))
+                        .foregroundColor(.white.opacity(0.80))
+
+                    Text("Копіювати")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.50))
+                }
+            }
 
             if !vm.items.isEmpty {
                 Button {
@@ -387,7 +398,7 @@ struct HistoryView: View {
                 } label: {
                     Text("Очистити все")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AstryxTheme.red.opacity(0.80))
+                        .foregroundColor(AstryxTheme.red.opacity(0.65))
                 }
                 .buttonStyle(.plain)
             }
@@ -405,98 +416,84 @@ struct HistoryRowView: View {
     @ObservedObject private var theme = ThemeManager.shared
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            // Main Transcript Content
-            VStack(alignment: .leading, spacing: 5) {
-                Text(item.text)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundColor(.white.opacity(0.92))
-                    .lineSpacing(2.5)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        Button {
+            onPaste()
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                // Main Transcript Content
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(item.text)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundColor(.white.opacity(0.92))
+                        .lineSpacing(2.5)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 6) {
-                    Text(item.formattedTime)
-                        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.40))
+                    HStack(spacing: 6) {
+                        Text(item.formattedTime)
+                            .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.35))
 
-                    Text("•")
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.25))
-
-                    Text(item.relativeTime)
-                        .font(.system(size: 10.5))
-                        .foregroundColor(.white.opacity(0.35))
-
-                    if !item.appDisplayName.isEmpty {
                         Text("•")
                             .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.20))
+
+                        Text(item.relativeTime)
+                            .font(.system(size: 10.5))
+                            .foregroundColor(.white.opacity(0.35))
+
+                        if !item.appDisplayName.isEmpty {
+                            Text("•")
+                                .font(.system(size: 10))
+                                .foregroundColor(.white.opacity(0.20))
+
+                            Text(item.appDisplayName)
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundColor(AstryxTheme.accent.opacity(0.75))
+                        }
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                // Quiet actions (Copy & Delete only — no repeating green buttons)
+                HStack(spacing: 4) {
+                    Button {
+                        onCopy()
+                    } label: {
+                        Image(systemName: isCopied ? "checkmark" : "doc.on.clipboard")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(isCopied ? AstryxTheme.accent : .white.opacity(0.35))
+                            .frame(width: 26, height: 26)
+                            .background(Circle().fill(Color.white.opacity(0.04)))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Скопіювати в буфер (⌘C)")
+
+                    Button {
+                        onDelete()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 10.5))
                             .foregroundColor(.white.opacity(0.25))
-
-                        Text(item.appDisplayName)
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundColor(AstryxTheme.accent.opacity(0.80))
+                            .frame(width: 26, height: 26)
                     }
+                    .buttonStyle(.plain)
+                    .help("Видалити запис")
                 }
             }
-
-            Spacer(minLength: 8)
-
-            // Compact Quick Actions
-            HStack(spacing: 6) {
-                // Quick Copy Button
-                Button {
-                    onCopy()
-                } label: {
-                    Image(systemName: isCopied ? "checkmark" : "doc.on.clipboard")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(isCopied ? AstryxTheme.shopifyMint : .white.opacity(0.60))
-                        .frame(width: 26, height: 26)
-                        .background(Circle().fill(Color.white.opacity(0.06)))
-                }
-                .buttonStyle(.plain)
-                .help("Скопіювати в буфер")
-
-                // Quick Paste Button (↵)
-                Button {
-                    onPaste()
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.turn.down.left")
-                            .font(.system(size: 9.5, weight: .heavy))
-                        Text("Вставити")
-                            .font(.system(size: 10.5, weight: .semibold))
-                    }
-                    .foregroundColor(AstryxTheme.accentText)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4.5)
-                    .background(Capsule().fill(AstryxTheme.activeGradient))
-                }
-                .buttonStyle(.plain)
-                .help("Вставити в курсор (клік)")
-
-                // Delete Item
-                Button {
-                    onDelete()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.white.opacity(0.30))
-                        .frame(width: 20, height: 26)
-                }
-                .buttonStyle(.plain)
-                .help("Видалити запис")
-            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.025))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.white.opacity(0.05), lineWidth: 0.8)
+                    )
+            )
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(AstryxTheme.card.opacity(0.50))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AstryxTheme.borderSubtle.opacity(0.6), lineWidth: AstryxTheme.borderWidth)
-                )
-        )
+        .buttonStyle(.plain)
     }
 }

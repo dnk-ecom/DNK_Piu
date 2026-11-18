@@ -51,36 +51,36 @@ public enum AstryxTheme {
 
     // MARK: - Surfaces
     public static var canvas: Color {
-        mode == .shopify ? Color(hex: "#02090A") : Color(hex: "#090A0C")
+        mode == .shopify ? Color(hex: "#090A0D") : Color(hex: "#090A0C")
     }
 
     public static var panel: Color {
-        mode == .shopify ? Color(hex: "#061A1C") : Color(hex: "#111317")
+        mode == .shopify ? Color(hex: "#0E1015") : Color(hex: "#101216")
     }
 
     public static var card: Color {
-        mode == .shopify ? Color(hex: "#0C2322") : Color(hex: "#16181D")
+        mode == .shopify ? Color(hex: "#13151B") : Color(hex: "#16181D")
     }
 
     public static var elevated: Color {
-        mode == .shopify ? Color(hex: "#102620") : Color(hex: "#1E2128")
+        mode == .shopify ? Color(hex: "#191C24") : Color(hex: "#1E2128")
     }
 
     public static var overlay: Color {
-        mode == .shopify ? Color(hex: "#02090A").opacity(0.85) : Color(hex: "#090A0C").opacity(0.85)
+        Color(hex: "#090A0D").opacity(0.85)
     }
 
     // MARK: - Borders
     public static var borderSubtle: Color {
-        mode == .shopify ? Color(hex: "#1E2C31").opacity(0.85) : Color.white.opacity(0.08)
+        Color.white.opacity(0.06)
     }
 
     public static var borderDefault: Color {
-        mode == .shopify ? Color(hex: "#2A3E45") : Color.white.opacity(0.14)
+        Color.white.opacity(0.10)
     }
 
     public static var borderStrong: Color {
-        mode == .shopify ? Color(hex: "#36F4A4").opacity(0.40) : Color.white.opacity(0.24)
+        mode == .shopify ? Color(hex: "#36F4A4").opacity(0.35) : Color.white.opacity(0.24)
     }
 
     public static let borderWidth: CGFloat = 0.8
@@ -173,19 +173,19 @@ public enum AstryxTheme {
 
     // MARK: - AppKit Colors
     public static var nsCanvas: NSColor {
-        mode == .shopify ? NSColor(hex: "#02090A") : NSColor(hex: "#090A0C")
+        mode == .shopify ? NSColor(hex: "#090A0D") : NSColor(hex: "#090A0C")
     }
 
     public static var nsPanel: NSColor {
-        mode == .shopify ? NSColor(hex: "#061A1C") : NSColor(hex: "#111317")
+        mode == .shopify ? NSColor(hex: "#0E1015") : NSColor(hex: "#101216")
     }
 
     public static var nsCard: NSColor {
-        mode == .shopify ? NSColor(hex: "#0C2322") : NSColor(hex: "#16181D")
+        mode == .shopify ? NSColor(hex: "#13151B") : NSColor(hex: "#16181D")
     }
 
     public static var nsElevated: NSColor {
-        mode == .shopify ? NSColor(hex: "#102620") : NSColor(hex: "#1E2128")
+        mode == .shopify ? NSColor(hex: "#191C24") : NSColor(hex: "#1E2128")
     }
 }
 
