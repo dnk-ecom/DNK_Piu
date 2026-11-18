@@ -337,7 +337,8 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             let base64Audio = audioData.base64EncodedString()
             let intelligentPrompt = """
             System instruction: You are a high-speed intelligent speech-to-text editor for the Astryx / DNK OS developer workstation (uk-UA / en-US).
-            Task: Transcribe spoken audio into CLEAN, FINAL, PRODUCTION-READY text.
+            Task: Transcribe spoken audio strictly into clean Ukrainian (uk-UA). Preserve English only for explicit IT/developer terms and code.
+            CRITICAL: Do NOT transcribe into Spanish, Russian, or other languages unless explicitly spoken.
 
             CRITICAL EDITING & SELF-CORRECTION RULES:
             1. Self-Correction & Retractions: If the speaker misspeaks, self-corrects, or says 'ой ні', 'видали це', 'закресли', 'ні, зачекай', 'тобто' or changes a word/sentence, apply the edit inline and output ONLY the final intended thought. Example: 'Створи таску для шапки... ой ні, для футера' -> 'Створи таску для футера'.
@@ -350,13 +351,14 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
                - 'двокрапка' -> :
                - 'крапка з комою' -> ;
                - 'тире' -> —
-            4. Developer Terminology: Preserve technical names in original casing and spelling (Shopify, Astryx, Clyro, Antigravity, commit, branch, PR, Swift, Python, React, Next.js, API, GraphQL, Tailwind, Docker).
-            5. Output Format: Return STRICTLY the final recognized and cleaned text without quotation marks, conversational replies, or code blocks. If no speech is present, return empty string.
+            4. Developer Terminology & Proper Names: Preserve technical names and project entities in original casing and spelling (Shopify, Astryx, Clyro, Antigravity, Герич, Денчік, Ластівка, commit, branch, PR, Swift, Python, React, Next.js, API, GraphQL, Tailwind, Docker).
+            5. Orthography: Always use proper Ukrainian Cyrillic orthography (e.g. 'диктовка', 'диктовці', never mix Latin characters like 'kt' into Ukrainian words).
+            6. Output Format: Return STRICTLY the final recognized and cleaned text without quotation marks, conversational replies, or code blocks. If no speech is present, return empty string.
             """
             let payload: [String: Any] = [
                 "audio_base64": base64Audio,
                 "mime_type": "audio/aac",
-                "model": "gemini-3.5-transcribe",
+                "model": "gemini-3.5-flash-lite",
                 "prompt": intelligentPrompt
             ]
 
@@ -497,6 +499,22 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             if let regex = try? NSRegularExpression(pattern: pattern) {
                 let range = NSRange(location: 0, length: text.utf16.count)
                 text = regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: repl)
+            }
+        }
+
+        // Clean hybrid Latin 'kt' -> Cyrillic 'кт'
+        text = text.replacingOccurrences(of: "kt", with: "кт")
+
+        // User custom corrections from ~/.dnk_runtime/piu/corrections.json
+        let corrPath = ("~/.dnk_runtime/piu/corrections.json" as NSString).expandingTildeInPath
+        if let data = try? Data(contentsOf: URL(fileURLWithPath: corrPath)),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+            for (wrong, right) in dict {
+                let pattern = "\\b" + NSRegularExpression.escapedPattern(for: wrong) + "\\b"
+                if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+                    let range = NSRange(location: 0, length: text.utf16.count)
+                    text = regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: right)
+                }
             }
         }
 

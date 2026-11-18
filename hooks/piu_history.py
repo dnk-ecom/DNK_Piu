@@ -10,6 +10,54 @@ import sys
 import time
 
 EVENTS_FILE = os.path.expanduser("~/.dnk_runtime/piu/voice_events.jsonl")
+VOCAB_FILE = os.path.expanduser("~/.dnk_runtime/piu/vocabulary.json")
+CORRECTIONS_FILE = os.path.expanduser("~/.dnk_runtime/piu/corrections.json")
+
+
+def manage_vocab(add_term: str = None, show: bool = False):
+    vocab = []
+    if os.path.exists(VOCAB_FILE):
+        try:
+            with open(VOCAB_FILE, "r", encoding="utf-8") as f:
+                vocab = json.load(f)
+        except Exception:
+            vocab = []
+    if add_term:
+        term = add_term.strip()
+        if term and term not in vocab:
+            vocab.append(term)
+            with open(VOCAB_FILE, "w", encoding="utf-8") as f:
+                json.dump(vocab, f, ensure_ascii=False, indent=2)
+            print(f"✅ Додано до персонального словника: \"{term}\"")
+        else:
+            print(f"ℹ️ Термін \"{term}\" вже присутній у словнику.")
+    if show or not add_term:
+        print("\n📚 ПЕРСОНАЛЬНИЙ СЛОВНИК ТЕРМІНІВ ТА ВИРАЗІВ DNK_PIU:")
+        print("═" * 50)
+        for idx, term in enumerate(vocab, 1):
+            print(f"  {idx}. {term}")
+        print(f"\nФайл: {VOCAB_FILE}\n")
+
+
+def manage_corrections(wrong: str = None, right: str = None, show: bool = False):
+    corrections = {}
+    if os.path.exists(CORRECTIONS_FILE):
+        try:
+            with open(CORRECTIONS_FILE, "r", encoding="utf-8") as f:
+                corrections = json.load(f)
+        except Exception:
+            corrections = {}
+    if wrong and right:
+        corrections[wrong.strip()] = right.strip()
+        with open(CORRECTIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(corrections, f, ensure_ascii=False, indent=2)
+        print(f"✅ Додано правило автовиправлення: \"{wrong}\" ➔ \"{right}\"")
+    if show or not (wrong and right):
+        print("\n🛠️ ПРАВИЛА АВТОВИПРАВЛЕНЬ (ACOUSTIC CORRECTIONS):")
+        print("═" * 50)
+        for k, v in corrections.items():
+            print(f"  • {k} ➔ {v}")
+        print(f"\nФайл: {CORRECTIONS_FILE}\n")
 
 
 def format_duration(seconds: float) -> str:
@@ -112,8 +160,22 @@ def main():
     parser.add_argument("--copy", "-c", type=int, default=None, help="Скопіювати запис за номером [N] в буфер")
     parser.add_argument("--open", "-o", "--gui", "-g", action="store_true", help="Відкрити нативний графічний HUD журнал надиктовок")
     parser.add_argument("--jsonl", action="store_true", help="Відкрити сирий JSONL файл у системному редакторі")
+    parser.add_argument("--vocab", action="store_true", help="Показати персональний словник термінів та виразів")
+    parser.add_argument("--vocab-add", type=str, metavar="TERM", help="Додати термін або вираз до персонального словника")
+    parser.add_argument("--corrections", action="store_true", help="Показати поточні правила автовиправлень")
+    parser.add_argument("--fix", nargs=2, metavar=("WRONG", "RIGHT"), help="Додати правило автовиправлення: --fix 'помилкове' 'вірне'")
 
     args = parser.parse_args()
+
+    if args.vocab or args.vocab_add is not None:
+        manage_vocab(add_term=args.vocab_add, show=args.vocab or not args.vocab_add)
+        return
+
+    if args.corrections or args.fix is not None:
+        wrong = args.fix[0] if args.fix else None
+        right = args.fix[1] if args.fix else None
+        manage_corrections(wrong=wrong, right=right, show=args.corrections or not args.fix)
+        return
 
     if args.open:
         open_gui_hud()
