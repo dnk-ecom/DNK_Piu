@@ -370,12 +370,29 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
 
             do {
                 request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-                let (data, response) = try await Self.session.data(for: request)
 
-                guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
+                var dataOpt: Data?
+                var respOpt: HTTPURLResponse?
+
+                for attempt in 1...2 {
+                    do {
+                        let (d, r) = try await Self.session.data(for: request)
+                        if let hr = r as? HTTPURLResponse {
+                            dataOpt = d
+                            respOpt = hr
+                            break
+                        }
+                    } catch {
+                        if attempt == 2 { throw error }
+                        // Stale idle socket after Mac sleep; retry immediately
+                        try? await Task.sleep(nanoseconds: 50_000_000)
+                    }
+                }
+
+                guard let data = dataOpt, let httpResponse = respOpt, httpResponse.statusCode == 200,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let text = json["text"] as? String else {
-                    let errStr = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String ?? "Invalid bridge response"
+                    let errStr = (dataOpt.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["error"] as? String) ?? "Invalid bridge response"
                     await MainActor.run {
                         self.isProcessing = false
                         self.errorMessage = errStr
