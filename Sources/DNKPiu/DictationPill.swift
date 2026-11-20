@@ -74,8 +74,17 @@ struct SwallowIconView: View {
     let phase: DictationPhase
     let audioLevel: Float
 
+    private var isAnimating: Bool {
+        switch phase {
+        case .listening, .thinking:
+            return true
+        default:
+            return false
+        }
+    }
+
     var body: some View {
-        if case .idle = phase {
+        if !isAnimating {
             ZStack(alignment: .center) {
                 SwallowShape()
                     .fill(swallowColor)

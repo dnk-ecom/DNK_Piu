@@ -30,8 +30,17 @@ public struct DNAHelixView: View {
         return false
     }
 
+    private var isAnimating: Bool {
+        switch phase {
+        case .listening, .thinking:
+            return true
+        default:
+            return false
+        }
+    }
+
     public var body: some View {
-        if case .idle = phase {
+        if !isAnimating {
             Canvas { context, canvasSize in
                 renderMicrophone(context: &context, size: canvasSize, time: 0)
             }
