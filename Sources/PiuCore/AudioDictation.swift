@@ -335,31 +335,20 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             try? FileManager.default.removeItem(at: self.recordingURL)
 
             let base64Audio = audioData.base64EncodedString()
-            let intelligentPrompt = """
-            System instruction: You are a high-speed intelligent speech-to-text editor for the Astryx / DNK OS developer workstation (uk-UA / en-US).
-            Task: Transcribe spoken audio strictly into clean Ukrainian (uk-UA). Preserve English only for explicit IT/developer terms and code.
-            CRITICAL: Do NOT transcribe into Spanish, Russian, or other languages unless explicitly spoken.
+            let settings = DictationSettings.shared
+            let customPrompt = settings.buildPrompt(targetApp: destApp?.bundleIdentifier)
 
-            CRITICAL EDITING & SELF-CORRECTION RULES:
-            1. Self-Correction & Retractions: If the speaker misspeaks, self-corrects, or says 'ой ні', 'видали це', 'закресли', 'ні, зачекай', 'тобто' or changes a word/sentence, apply the edit inline and output ONLY the final intended thought. Example: 'Створи таску для шапки... ой ні, для футера' -> 'Створи таску для футера'.
-            2. Filler Words: Strip speech disfluencies and fillers (е-е, ну, типу, коротше, власне, так би мовити) unless essential to meaning.
-            3. Formatting & Punctuation Commands:
-               - 'новий рядок' / 'з нового рядка' -> \\n
-               - 'новий абзац' -> \\n\\n
-               - 'знак оклику' -> !
-               - 'знак питання' -> ?
-               - 'двокрапка' -> :
-               - 'крапка з комою' -> ;
-               - 'тире' -> —
-            4. Developer Terminology & Proper Names: Preserve technical names and project entities in original casing and spelling (Shopify, Astryx, Clyro, Antigravity, Герич, Денчік, Ластівка, commit, branch, PR, Swift, Python, React, Next.js, API, GraphQL, Tailwind, Docker).
-            5. Orthography: Always use proper Ukrainian Cyrillic orthography (e.g. 'диктовка', 'диктовці', never mix Latin characters like 'kt' into Ukrainian words).
-            6. Output Format: Return STRICTLY the final recognized and cleaned text without quotation marks, conversational replies, or code blocks. If no speech is present, return empty string.
-            """
             let payload: [String: Any] = [
                 "audio_base64": base64Audio,
                 "mime_type": "audio/aac",
-                "model": "gemini-3.5-flash-lite",
-                "prompt": intelligentPrompt
+                "model": settings.selectedModel.rawValue,
+                "prompt": customPrompt,
+                "formatting_mode": settings.formattingMode.rawValue,
+                "strip_fillers": settings.stripFillers,
+                "self_correction": settings.selfCorrection,
+                "app_aware": settings.appAwareFormatting,
+                "voice_commands": settings.voiceCommands,
+                "target_app": destApp?.bundleIdentifier ?? ""
             ]
 
             var request = URLRequest(url: self.bridgeURL)
@@ -508,14 +497,16 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
         }
 
         // Deterministic regex replacement for spoken formatting commands
-        let replacements: [(String, String)] = [
-            ("(?i)\\b(новий рядок|нова стрічка)\\b", "\n"),
-            ("(?i)\\b(новий абзац)\\b", "\n\n")
-        ]
-        for (pattern, repl) in replacements {
-            if let regex = try? NSRegularExpression(pattern: pattern) {
-                let range = NSRange(location: 0, length: text.utf16.count)
-                text = regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: repl)
+        if DictationSettings.shared.voiceCommands {
+            let replacements: [(String, String)] = [
+                ("(?i)\\b(новий рядок|нова стрічка)\\b", "\n"),
+                ("(?i)\\b(новий абзац)\\b", "\n\n")
+            ]
+            for (pattern, repl) in replacements {
+                if let regex = try? NSRegularExpression(pattern: pattern) {
+                    let range = NSRange(location: 0, length: text.utf16.count)
+                    text = regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: repl)
+                }
             }
         }
 

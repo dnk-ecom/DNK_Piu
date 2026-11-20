@@ -18,6 +18,7 @@ public struct MenubarPopoverView: View {
     @ObservedObject private var dictation = AudioDictation.shared
     @ObservedObject private var theme = ThemeManager.shared
     @ObservedObject private var hotKey = DictationHotKey.shared
+    @ObservedObject private var settings = DictationSettings.shared
     @ObservedObject private var vm: PopoverViewModel
 
     var onOpenHistory: () -> Void
@@ -62,7 +63,7 @@ public struct MenubarPopoverView: View {
             }
             .animation(.spring(response: 0.28, dampingFraction: 0.85), value: vm.showSettings)
         }
-        .frame(width: 330, height: 410)
+        .frame(width: 340, height: 530)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -120,12 +121,12 @@ public struct MenubarPopoverView: View {
             Divider()
                 .background(Color.white.opacity(0.10))
 
-            // Settings Body
-            settingsBodyView
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-
-            Spacer(minLength: 0)
+            // Settings Body with smooth scroll
+            ScrollView(.vertical, showsIndicators: false) {
+                settingsBodyView
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+            }
 
             Divider()
                 .background(Color.white.opacity(0.10))
@@ -415,92 +416,300 @@ public struct MenubarPopoverView: View {
     // MARK: - Settings Body View
     private var settingsBodyView: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Hotkey Section (Strict single key choice!)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Клавіша диктування")
+            formattingSection
+            intelligenceSection
+            modelSection
+            vocabularySection
+            hotkeySection
+            themeSection
+            accessibilitySection
+        }
+    }
+
+    // MARK: - Settings Subsections
+    private var formattingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: settings.formattingMode.iconName)
+                    .foregroundColor(AstryxTheme.accent)
+                    .font(.system(size: 12, weight: .bold))
+                Text("Режим структури")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                Spacer()
+            }
+
+            Picker("Стиль", selection: $settings.formattingMode) {
+                ForEach(FormattingMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+
+            Text(settings.formattingMode.subtitle)
+                .font(.system(size: 10))
+                .foregroundColor(Color(hex: "#A1A1AA"))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
+    }
+
+    private var intelligenceSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "wand.and.stars")
+                    .foregroundColor(AstryxTheme.accent)
+                    .font(.system(size: 12, weight: .bold))
+                Text("Інтелект розпізнавання")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                Spacer()
+            }
+
+            Toggle(isOn: $settings.stripFillers) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Видаляти слова-паразити")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white)
+                    Text("е-е, ну, типу, коротше, власне...")
+                        .font(.system(size: 9.5))
+                        .foregroundColor(Color(hex: "#A1A1AA"))
+                }
+            }
+            .toggleStyle(.switch)
+            .tint(AstryxTheme.accent)
+
+            Divider().background(Color.white.opacity(0.06))
+
+            Toggle(isOn: $settings.selfCorrection) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Самовиправлення обмовок")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white)
+                    Text("«ой ні», «тобто», відміна фрази на льоту")
+                        .font(.system(size: 9.5))
+                        .foregroundColor(Color(hex: "#A1A1AA"))
+                }
+            }
+            .toggleStyle(.switch)
+            .tint(AstryxTheme.accent)
+
+            Divider().background(Color.white.opacity(0.06))
+
+            Toggle(isOn: $settings.appAwareFormatting) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Контекст активної програми")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white)
+                    Text("Адаптація під IDE, чат або пошту")
+                        .font(.system(size: 9.5))
+                        .foregroundColor(Color(hex: "#A1A1AA"))
+                }
+            }
+            .toggleStyle(.switch)
+            .tint(AstryxTheme.accent)
+
+            Divider().background(Color.white.opacity(0.06))
+
+            Toggle(isOn: $settings.voiceCommands) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Голосове форматування")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white)
+                    Text("Команди «новий рядок», «новий абзац», знаки")
+                        .font(.system(size: 9.5))
+                        .foregroundColor(Color(hex: "#A1A1AA"))
+                }
+            }
+            .toggleStyle(.switch)
+            .tint(AstryxTheme.accent)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
+    }
+
+    private var modelSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "cpu")
+                        .foregroundColor(AstryxTheme.accent)
+                        .font(.system(size: 12, weight: .bold))
+                    Text("ШІ-модель")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white)
-                    Spacer()
-                    Text("Hold-to-talk")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                }
+                Spacer()
+                Text(settings.selectedModel.speedBadge)
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundColor(AstryxTheme.accent)
+            }
+
+            Picker("Модель", selection: $settings.selectedModel) {
+                ForEach(DictationModel.allCases) { model in
+                    Text(model.title).tag(model)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+
+            Text("Виконується через Vertex AI Keep-Alive з апаратною затримкою ~0.7-0.8s.")
+                .font(.system(size: 9.5))
+                .foregroundColor(Color(hex: "#A1A1AA"))
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
+    }
+
+    private var vocabularySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "character.book.closed")
+                    .foregroundColor(AstryxTheme.accent)
+                    .font(.system(size: 12, weight: .bold))
+                Text("Персональний словник")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                Spacer()
+            }
+
+            Text("Додавайте власні професійні терміни, назви та правила автозаміни.")
+                .font(.system(size: 10))
+                .foregroundColor(Color(hex: "#A1A1AA"))
+
+            HStack(spacing: 8) {
+                Button {
+                    DictationSettings.openVocabularyFile()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 10))
+                        Text("Словник термінів")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.12), lineWidth: 0.6))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.white)
+
+                Button {
+                    DictationSettings.openCorrectionsFile()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 10))
+                        Text("Автозаміна")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.12), lineWidth: 0.6))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.white)
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
+    }
+
+    private var hotkeySection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Клавіша диктування")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                Spacer()
+                Text("Hold-to-talk")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(Color(hex: "#A1A1AA"))
+            }
+
+            Picker("Клавіша", selection: Binding(
+                get: { hotKey.activePreset },
+                set: { hotKey.setPreset($0) }
+            )) {
+                ForEach(FlowKeyPreset.allCases) { preset in
+                    Text(preset.displayName).tag(preset)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+
+            Text("Спрацьовує виключно обрана клавіша. Інша клавіша вільна для інших програм.")
+                .font(.system(size: 10))
+                .foregroundColor(Color(hex: "#A1A1AA"))
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
+    }
+
+    private var themeSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Тема оформлення")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white)
+
+            Picker("Тема", selection: Binding(
+                get: { theme.mode },
+                set: { theme.setMode($0) }
+            )) {
+                ForEach(AppThemeMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
+    }
+
+    private var accessibilitySection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            let isTrusted = DictationHotKey.isAccessibilityGranted()
+            HStack(spacing: 8) {
+                Image(systemName: isTrusted ? "checkmark.shield.fill" : "exclamationmark.shield")
+                    .foregroundColor(isTrusted ? AstryxTheme.accent : AstryxTheme.amber)
+                    .font(.system(size: 14))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isTrusted ? "Accessibility: Дозволено ✓" : "Потрібні дозволи")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white)
+
+                    Text("Для миттєвої вставки тексту в активну програму")
+                        .font(.system(size: 10))
                         .foregroundColor(Color(hex: "#A1A1AA"))
                 }
 
-                Picker("Клавіша", selection: Binding(
-                    get: { hotKey.activePreset },
-                    set: { hotKey.setPreset($0) }
-                )) {
-                    ForEach(FlowKeyPreset.allCases) { preset in
-                        Text(preset.displayName).tag(preset)
+                Spacer()
+
+                if !isTrusted {
+                    Button("Надати") {
+                        DictationHotKey.openAccessibilitySettings()
                     }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-
-                Text("Спрацьовує виключно обрана клавіша. Інша клавіша вільна для інших програм.")
-                    .font(.system(size: 10))
-                    .foregroundColor(Color(hex: "#A1A1AA"))
-            }
-            .padding(10)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
-
-            // Theme Section
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Тема оформлення")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white)
-
-                Picker("Тема", selection: Binding(
-                    get: { theme.mode },
-                    set: { theme.setMode($0) }
-                )) {
-                    ForEach(AppThemeMode.allCases) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-            }
-            .padding(10)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
-
-            // Accessibility Status Card
-            VStack(alignment: .leading, spacing: 6) {
-                let isTrusted = DictationHotKey.isAccessibilityGranted()
-                HStack(spacing: 8) {
-                    Image(systemName: isTrusted ? "checkmark.shield.fill" : "exclamationmark.shield")
-                        .foregroundColor(isTrusted ? AstryxTheme.accent : AstryxTheme.amber)
-                        .font(.system(size: 14))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(isTrusted ? "Accessibility: Дозволено ✓" : "Потрібні дозволи")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
-
-                        Text("Для миттєвої вставки тексту в активну програму")
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(hex: "#A1A1AA"))
-                    }
-
-                    Spacer()
-
-                    if !isTrusted {
-                        Button("Надати") {
-                            DictationHotKey.openAccessibilitySettings()
-                        }
-                        .font(.system(size: 10, weight: .bold))
-                        .buttonStyle(.borderedProminent)
-                        .tint(AstryxTheme.accent)
-                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .buttonStyle(.borderedProminent)
+                    .tint(AstryxTheme.accent)
                 }
             }
-            .padding(10)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
         }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 0.8))
     }
 
     // MARK: - Footers
