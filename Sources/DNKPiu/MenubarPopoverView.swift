@@ -348,14 +348,20 @@ public struct MenubarPopoverView: View {
         let isHovered = (vm.hoveredItemId == item.id)
         let isCopied = (vm.copiedId == item.id)
 
+        let isFailure = item.text.hasPrefix("[⚠️")
+
         return Button {
-            pasteAndClose(item.text)
+            if isFailure {
+                dictation.retryLastRecording()
+            } else {
+                pasteAndClose(item.text)
+            }
         } label: {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.text)
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundColor(Color(hex: "#FAFAFA"))
+                        .font(.system(size: 12, weight: isFailure ? .semibold : .regular))
+                        .foregroundColor(isFailure ? AstryxTheme.amber : Color(hex: "#FAFAFA"))
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -374,26 +380,49 @@ public struct MenubarPopoverView: View {
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(AstryxTheme.accent)
                         }
+
+                        if isFailure {
+                            Text("• Клікніть для повтору")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(AstryxTheme.accent)
+                        }
                     }
                 }
 
                 Spacer(minLength: 4)
 
-                // Trailing Quick Copy Action
-                Button {
-                    copyToClipboard(item)
-                } label: {
-                    Image(systemName: isCopied ? "checkmark" : "doc.on.clipboard")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(isCopied ? AstryxTheme.accent : Color(hex: "#D4D4D8"))
-                        .frame(width: 22, height: 22)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(isCopied ? AstryxTheme.accent.opacity(0.15) : Color.white.opacity(0.06))
-                        )
+                if isFailure {
+                    Button {
+                        dictation.retryLastRecording()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(AstryxTheme.accent)
+                            .frame(width: 22, height: 22)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(AstryxTheme.accent.opacity(0.18))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Повторити розпізнавання збереженого аудіо")
+                } else {
+                    // Trailing Quick Copy Action
+                    Button {
+                        copyToClipboard(item)
+                    } label: {
+                        Image(systemName: isCopied ? "checkmark" : "doc.on.clipboard")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(isCopied ? AstryxTheme.accent : Color(hex: "#D4D4D8"))
+                            .frame(width: 22, height: 22)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(isCopied ? AstryxTheme.accent.opacity(0.15) : Color.white.opacity(0.06))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Скопіювати")
                 }
-                .buttonStyle(.plain)
-                .help("Скопіювати")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)

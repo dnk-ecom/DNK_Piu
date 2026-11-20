@@ -98,7 +98,7 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.httpMaximumConnectionsPerHost = 4
-        config.timeoutIntervalForRequest = 10.0
+        config.timeoutIntervalForRequest = 120.0
         config.httpShouldUsePipelining = true
         return URLSession(configuration: config)
     }()
@@ -307,8 +307,8 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             self.isProcessing = true
             self.phase = .thinking
 
-            // Safety watchdog: never let .thinking freeze the UI if network drops
-            DispatchQueue.main.asyncAfter(deadline: .now() + 14.0) { [weak self] in
+            // Safety watchdog: allows up to 125 seconds for long-form voice memos without freezing UI
+            DispatchQueue.main.asyncAfter(deadline: .now() + 125.0) { [weak self] in
                 guard let self = self else { return }
                 if self.isProcessing || self.phase == .thinking {
                     self.isProcessing = false
@@ -331,7 +331,22 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
                 return
             }
 
-            // Immediately delete the audio file after loading to prevent stale audio playback
+            // 1. Zero-data-loss: persistently archive audio to ~/.dnk_runtime/piu/recordings/
+            let backupDir = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".dnk_runtime/piu/recordings")
+            try? FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true)
+            let lastRecordingURL = backupDir.appendingPathComponent("last_recording.m4a")
+            try? FileManager.default.removeItem(at: lastRecordingURL)
+            try? audioData.write(to: lastRecordingURL)
+
+            // Keep rolling timestamped archive (up to 20 files)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyyMMdd_HHmmss"
+            let archiveName = "rec_\(formatter.string(from: Date())).m4a"
+            let archiveURL = backupDir.appendingPathComponent(archiveName)
+            try? audioData.write(to: archiveURL)
+
+            // Clean up temporary recording container only after safe backup
             try? FileManager.default.removeItem(at: self.recordingURL)
 
             let base64Audio = audioData.base64EncodedString()
@@ -355,7 +370,7 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("keep-alive", forHTTPHeaderField: "Connection")
-            request.timeoutInterval = 10.0
+            request.timeoutInterval = 120.0
 
             do {
                 request.httpBody = try JSONSerialization.data(withJSONObject: payload)
@@ -441,6 +456,103 @@ public final class AudioDictation: NSObject, ObservableObject, AVAudioRecorderDe
                 await MainActor.run {
                     self.isProcessing = false
                     self.errorMessage = "Bridge request error: \(error.localizedDescription)"
+                    self.phase = .failed(self.errorMessage ?? "Error")
+                    completion?(nil)
+
+                    // Zero-data-loss: record failure into history with note that audio was preserved!
+                    let failureItem = DictationItem(
+                        text: "[⚠️ Помилка обробки: аудіо збережено в ~/.dnk_runtime/piu/recordings/last_recording.m4a]",
+                        targetApp: destApp?.bundleIdentifier
+                    )
+                    self.history.insert(failureItem, at: 0)
+                    if self.history.count > 30 { self.history.removeLast() }
+                    self.saveHistory()
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        if case .failed = self.phase { self.phase = .idle }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Re-transcribes the last saved audio recording from ~/.dnk_runtime/piu/recordings/last_recording.m4a
+    public func retryLastRecording(completion: ((String?) -> Void)? = nil) {
+        let backupURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".dnk_runtime/piu/recordings/last_recording.m4a")
+        guard FileManager.default.fileExists(atPath: backupURL.path),
+              let audioData = try? Data(contentsOf: backupURL), !audioData.isEmpty else {
+            self.phase = .failed("No backup recording")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.phase = .idle }
+            return
+        }
+
+        self.phase = .thinking
+        self.isProcessing = true
+        let destApp = self.targetApp
+
+        Task {
+            let base64Audio = audioData.base64EncodedString()
+            let settings = DictationSettings.shared
+            let customPrompt = settings.buildPrompt(targetApp: destApp?.bundleIdentifier)
+
+            let payload: [String: Any] = [
+                "audio_base64": base64Audio,
+                "mime_type": "audio/aac",
+                "model": settings.selectedModel.rawValue,
+                "prompt": customPrompt,
+                "formatting_mode": settings.formattingMode.rawValue,
+                "strip_fillers": settings.stripFillers,
+                "self_correction": settings.selfCorrection,
+                "app_aware": settings.appAwareFormatting,
+                "voice_commands": settings.voiceCommands,
+                "target_app": destApp?.bundleIdentifier ?? ""
+            ]
+
+            var request = URLRequest(url: self.bridgeURL)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("keep-alive", forHTTPHeaderField: "Connection")
+            request.timeoutInterval = 120.0
+
+            do {
+                request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+                let (data, resp) = try await Self.session.data(for: request)
+                guard let httpResponse = resp as? HTTPURLResponse, httpResponse.statusCode == 200,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let text = json["text"] as? String else {
+                    throw NSError(domain: "DNKPiu", code: -1, userInfo: [NSLocalizedDescriptionKey: "Bridge error"])
+                }
+
+                let rawTranscript = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                let transcript = Self.sanitizeTranscript(rawTranscript)
+                await MainActor.run {
+                    self.isProcessing = false
+                    guard !transcript.isEmpty else {
+                        self.phase = .failed("Empty transcript")
+                        completion?(nil)
+                        return
+                    }
+
+                    self.lastTranscript = transcript
+                    let newItem = DictationItem(text: transcript, targetApp: destApp?.bundleIdentifier)
+                    self.history.insert(newItem, at: 0)
+                    if self.history.count > 30 { self.history.removeLast() }
+                    self.saveHistory()
+
+                    FlowPaste.insert(transcript, into: destApp)
+                    self.phase = .done(transcript, wasPasted: true)
+                    NSSound(named: "Pop")?.play()
+                    completion?(transcript)
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        if case .done = self.phase { self.phase = .idle }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.isProcessing = false
+                    self.errorMessage = "Retry failed: \(error.localizedDescription)"
                     self.phase = .failed(self.errorMessage ?? "Error")
                     completion?(nil)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
