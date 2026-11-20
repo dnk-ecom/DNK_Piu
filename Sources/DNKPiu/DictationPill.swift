@@ -75,23 +75,32 @@ struct SwallowIconView: View {
     let audioLevel: Float
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-            let color = swallowColor
-            let (scale, angle, yOffset) = animationParameters(t: t)
-
+        if case .idle = phase {
             ZStack(alignment: .center) {
                 SwallowShape()
-                    .fill(color)
+                    .fill(swallowColor)
                     .frame(width: 13, height: 13)
-                    .scaleEffect(scale)
-                    .rotationEffect(.degrees(angle))
-                    .offset(y: yOffset)
-                    .shadow(color: color.opacity(glowOpacity), radius: glowRadius)
+            }
+            .frame(width: 18, height: 18, alignment: .center)
+        } else {
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                let color = swallowColor
+                let (scale, angle, yOffset) = animationParameters(t: t)
+
+                ZStack(alignment: .center) {
+                    SwallowShape()
+                        .fill(color)
+                        .frame(width: 13, height: 13)
+                        .scaleEffect(scale)
+                        .rotationEffect(.degrees(angle))
+                        .offset(y: yOffset)
+                        .shadow(color: color.opacity(glowOpacity), radius: glowRadius)
+                }
+                .frame(width: 18, height: 18, alignment: .center)
             }
             .frame(width: 18, height: 18, alignment: .center)
         }
-        .frame(width: 18, height: 18, alignment: .center)
     }
 
     private var swallowColor: Color {
@@ -316,36 +325,44 @@ struct SevenWaveBarsView: View {
     @ObservedObject private var theme = ThemeManager.shared
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-            HStack(alignment: .center, spacing: 2.8) {
-                ForEach(0..<7, id: \.self) { i in
-                    let height: CGFloat = {
-                        if isThinking {
-                            let waveVal: Double = sin(t * 6.5 - Double(i) * 0.65)
-                            let wave: Double = max(0.08, waveVal)
-                            return CGFloat(3.5 + 11.0 * wave)
-                        } else {
-                            let level = levels.indices.contains(i) ? CGFloat(levels[i]) : 0.1
-                            return max(3.5, min(16.0, 3.5 + 12.5 * level))
-                        }
-                    }()
-
-                    Capsule()
-                        .fill(
-                            isThinking
-                                ? AnyShapeStyle(barThinkingGradient(for: i))
-                                : AnyShapeStyle(Color.white.opacity(0.92))
-                        )
-                        .frame(width: 2.8, height: height)
-                        .shadow(
-                            color: isThinking ? Color(hex: "#3B82F6").opacity(0.40) : .clear,
-                            radius: isThinking ? 2.5 : 0
-                        )
-                }
+        if isThinking {
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                bars(time: t)
             }
-            .frame(height: 18)
+        } else {
+            bars(time: 0)
         }
+    }
+
+    private func bars(time t: TimeInterval) -> some View {
+        HStack(alignment: .center, spacing: 2.8) {
+            ForEach(0..<7, id: \.self) { i in
+                let height: CGFloat = {
+                    if isThinking {
+                        let waveVal: Double = sin(t * 6.5 - Double(i) * 0.65)
+                        let wave: Double = max(0.08, waveVal)
+                        return CGFloat(3.5 + 11.0 * wave)
+                    } else {
+                        let level = levels.indices.contains(i) ? CGFloat(levels[i]) : 0.1
+                        return max(3.5, min(16.0, 3.5 + 12.5 * level))
+                    }
+                }()
+
+                Capsule()
+                    .fill(
+                        isThinking
+                            ? AnyShapeStyle(barThinkingGradient(for: i))
+                            : AnyShapeStyle(Color.white.opacity(0.92))
+                    )
+                    .frame(width: 2.8, height: height)
+                    .shadow(
+                        color: isThinking ? Color(hex: "#3B82F6").opacity(0.40) : .clear,
+                        radius: isThinking ? 2.5 : 0
+                    )
+            }
+        }
+        .frame(height: 18)
     }
 
     private func barThinkingGradient(for index: Int) -> LinearGradient {

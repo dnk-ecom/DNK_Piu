@@ -204,10 +204,18 @@ public final class DictationHotKey: ObservableObject {
 
         guard event.type == .flagsChanged else { return }
 
-        // Check if event keyCode matches our configured preset
-        guard activePreset.matches(keyCode: event.keyCode) else { return }
-
         let isDown = activePreset.isDown(event.modifierFlags)
+        let matchesKey = activePreset.matches(keyCode: event.keyCode)
+
+        // Resilient modifier tracking:
+        // If the key is physically no longer down according to system modifier flags,
+        // ALWAYS process as release even if event.keyCode doesn't match (e.g. multi-key release).
+        if isKeyDown && !isDown {
+            // Fall through to release logic below
+        } else if !matchesKey {
+            return
+        }
+
         let uptime = ProcessInfo.processInfo.systemUptime
 
         if isDown {

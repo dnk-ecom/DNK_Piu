@@ -31,13 +31,20 @@ public struct DNAHelixView: View {
     }
 
     public var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
+        if case .idle = phase {
             Canvas { context, canvasSize in
-                renderMicrophone(context: &context, size: canvasSize, time: t)
+                renderMicrophone(context: &context, size: canvasSize, time: 0)
             }
+            .frame(width: size, height: size, alignment: .center)
+        } else {
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                Canvas { context, canvasSize in
+                    renderMicrophone(context: &context, size: canvasSize, time: t)
+                }
+            }
+            .frame(width: size, height: size, alignment: .center)
         }
-        .frame(width: size, height: size, alignment: .center)
     }
 
     // MARK: - Metal-Accelerated Pure Microphone Renderer (Zero Background)
